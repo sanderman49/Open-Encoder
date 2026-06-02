@@ -1,0 +1,114 @@
+name: FFmpeg – macOS (Intel + Apple Silicon)
+
+on:
+  push:
+    paths:
+      - .github/workflows/ffmpeg-macos.yml
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13   # Intel x86_64
+            triple: x86_64-apple-darwin
+          - runner: macos-14   # Apple Silicon arm64
+            triple: aarch64-apple-darwin
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          brew install nasm pkg-config \
+            x264 x265 libvpx svt-av1 \
+            lame libvorbis opus
+
+      - name: Remove dylibs to force static linking
+        # Deleting dylibs makes the linker fall back to .a files.
+        # Runner is ephemeral so this is safe.
+        run: |
+          prefix=$(brew --prefix)
+          for lib in \
+            libx264 libx265 \
+            libvpx \
+            libSvtAv1Enc \
+            libmp3lame \
+            libvorbis libvorbisenc libvorbisfile libogg \
+            libopus; do
+            rm -f "$prefix"/lib/${lib}.dylib \
+                  "$prefix"/lib/${lib}.*.dylib 2>/dev/null || true
+          done
+
+      - name: Clone FFmpeg
+        run: git clone --depth=1 https://git.ffmpeg.org/ffmpeg.git
+
+      - name: Configure
+        working-directory: ffmpeg
+        run: |
+          prefix=$(brew --prefix)
+          ./configure \
+            --prefix="$GITHUB_WORKSPACE/ffmpeg_out" \
+            --enable-gpl \
+            --enable-libx264 \
+            --enable-libx265 \
+            --enable-libvpx \
+            --enable-libsvtav1 \
+            --enable-libmp3lame \
+            --enable-libvorbis \
+            --enable-libopus \
+            --enable-videotoolbox \
+            --enable-audiotoolbox \
+            --enable-coreimage \
+            --extra-cflags="-I$prefix/include" \
+            --extra-ldflags="-L$prefix/lib" \
+            --pkg-config-flags="--static" \
+            --disable-shared \
+            --enable-static \
+            --disable-doc \
+            --disable-htmlpages \
+            --disable-manpages \
+            --disable-podpages \
+            --disable-txtpages
+
+      - name: Build
+        working-directory: ffmpeg
+        run: make -j$(sysctl -n hw.logicalcpu)
+
+      - name: Install
+        working-directory: ffmpeg
+        run: make install
+
+      - name: Package and verify
+        run: |
+          mkdir -p binaries
+          cp ffmpeg_out/bin/ffmpeg  binaries/ffmpeg-${{ matrix.triple }}
+          cp ffmpeg_out/bin/ffprobe binaries/ffprobe-${{ matrix.triple }}
+          chmod +x binaries/ffmpeg-${{ matrix.triple }}
+          chmod +x binaries/ffprobe-${{ matrix.triple }}
+
+          echo "=== Version ==="
+          ./binaries/ffmpeg-${{ matrix.triple }} -version
+
+          echo "=== Dynamic deps ==="
+          otool -L binaries/ffmpeg-${{ matrix.triple }}
+          otool -L binaries/ffprobe-${{ matrix.triple }}
+
+      - name: Check no Homebrew dylib leakage
+        run: |
+          bad=$(otool -L binaries/ffmpeg-${{ matrix.triple }} binaries/ffprobe-${{ matrix.triple }} \
+                | grep -E '/opt/homebrew|/usr/local/lib' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Homebrew dylib dependencies found — static linking incomplete:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "Clean — no Homebrew paths in dynamic deps."
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-${{ matrix.triple }}
+          path: binaries/
+          retention-days: 90

@@ -1,0 +1,26 @@
+{
+  "identifier": "main-capability",
+  "description": "Main window permissions",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        { "name": "binaries/ffmpeg", "sidecar": true, "args": true },
+        { "name": "binaries/ffprobe", "sidecar": true, "args": true }
+      ]
+    },
+    "shell:allow-spawn",
+    "shell:allow-kill",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:allow-read-all",
+    "fs:allow-write-all",
+    "store:allow-get",
+    "store:allow-set",
+    "store:allow-delete",
+    "store:allow-keys",
+    "store:allow-save",
+    "store:allow-load"
+  ]
+}

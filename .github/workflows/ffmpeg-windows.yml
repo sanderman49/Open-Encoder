@@ -1,0 +1,37 @@
+name: FFmpeg – Windows x86_64
+
+on:
+  push:
+    paths:
+      - .github/workflows/ffmpeg-windows.yml
+
+jobs:
+  fetch:
+    runs-on: windows-latest
+    steps:
+      - name: Download BtbN GPL static build
+        shell: powershell
+        run: |
+          $tmp = "$env:TEMP\ff_extract"
+          Invoke-WebRequest `
+            -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" `
+            -OutFile "$env:TEMP\ffmpeg.zip"
+          Expand-Archive -Path "$env:TEMP\ffmpeg.zip" -DestinationPath $tmp -Force
+          New-Item -ItemType Directory -Force -Path "binaries" | Out-Null
+          $ff = Get-ChildItem $tmp -Recurse -Filter ffmpeg.exe  | Select-Object -First 1
+          $fp = Get-ChildItem $tmp -Recurse -Filter ffprobe.exe | Select-Object -First 1
+          Copy-Item $ff.FullName  "binaries\ffmpeg-x86_64-pc-windows-msvc.exe"
+          Copy-Item $fp.FullName  "binaries\ffprobe-x86_64-pc-windows-msvc.exe"
+
+      - name: Verify
+        shell: powershell
+        run: |
+          .\binaries\ffmpeg-x86_64-pc-windows-msvc.exe -version
+          .\binaries\ffprobe-x86_64-pc-windows-msvc.exe -version
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-x86_64-pc-windows-msvc
+          path: binaries\
+          retention-days: 90

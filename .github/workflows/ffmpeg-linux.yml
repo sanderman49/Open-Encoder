@@ -1,0 +1,41 @@
+name: FFmpeg – Linux x86_64
+
+on:
+  push:
+    paths:
+      - .github/workflows/ffmpeg-linux.yml
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download BtbN GPL static build
+        run: |
+          curl -L -o ffmpeg.tar.xz \
+            https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+
+      - name: Extract binaries
+        run: |
+          mkdir ff_extract
+          tar -xJf ffmpeg.tar.xz -C ff_extract
+          mkdir -p binaries
+          find ff_extract -name 'ffmpeg'  -type f | head -1 \
+            | xargs -I{} cp {} binaries/ffmpeg-x86_64-unknown-linux-gnu
+          find ff_extract -name 'ffprobe' -type f | head -1 \
+            | xargs -I{} cp {} binaries/ffprobe-x86_64-unknown-linux-gnu
+          chmod +x binaries/ffmpeg-x86_64-unknown-linux-gnu
+          chmod +x binaries/ffprobe-x86_64-unknown-linux-gnu
+
+      - name: Verify
+        run: |
+          binaries/ffmpeg-x86_64-unknown-linux-gnu -version
+          binaries/ffprobe-x86_64-unknown-linux-gnu -version
+          echo "--- ldd ---"
+          ldd binaries/ffmpeg-x86_64-unknown-linux-gnu
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-x86_64-unknown-linux-gnu
+          path: binaries/
+          retention-days: 90
