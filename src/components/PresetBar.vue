@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { usePresetsStore } from '@/stores/presets'
+import { Settings, Trash2 } from 'lucide-vue-next'
 
 const emit = defineEmits<{ openSettings: [] }>()
 
@@ -72,8 +73,8 @@ const isBuiltin = () => store.activePresetId.startsWith('builtin-')
           class="btn btn-ghost btn-del"
           @click="deleteActive"
           title="Delete this preset"
-        >Delete</button>
-        <button class="btn btn-ghost icon-btn" @click="emit('openSettings')" title="Settings">⚙</button>
+        ><Trash2 :size="14" /></button>
+        <button class="btn btn-ghost icon-btn" @click="emit('openSettings')" title="Settings"><Settings :size="15" /></button>
       </template>
     </div>
   </header>

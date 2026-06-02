@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useJobRunner } from '@/composables/useJobRunner'
 import { useFileDialog } from '@/composables/useFileDialog'
 import type { VideoProbeResult } from '@/types/preset'
+import { Clapperboard, Loader, TriangleAlert } from 'lucide-vue-next'
 
 const emit = defineEmits<{
   fileSelected: [path: string, probe: VideoProbeResult]
@@ -70,7 +71,7 @@ function basename(path: string) {
     @click="onBrowse"
   >
     <template v-if="loading">
-      <div class="dropzone__icon">⏳</div>
+      <Loader :size="32" class="spin" style="color: var(--muted)" />
       <p class="dropzone__label">Probing…</p>
     </template>
 
@@ -84,14 +85,14 @@ function basename(path: string) {
           <span v-if="probe.audioCodec" class="meta-item">{{ probe.audioCodec }}</span>
         </div>
         <div v-if="probe.isInterlaced" class="badge badge--warn">
-          ⚠ Interlaced ({{ probe.fieldOrder }})
+          <TriangleAlert :size="12" /> Interlaced ({{ probe.fieldOrder }})
         </div>
         <p class="dropzone__hint">Click or drop to change file</p>
       </div>
     </template>
 
     <template v-else>
-      <div class="dropzone__icon">🎬</div>
+      <Clapperboard :size="36" style="color: var(--muted)" />
       <p class="dropzone__label">Drop video here or click to browse</p>
       <p class="dropzone__sub">MP4, MKV, MOV, AVI, WebM, TS, MTS…</p>
     </template>
@@ -119,7 +120,6 @@ function basename(path: string) {
 .dropzone--drag { border-color: var(--accent); background: var(--accent-dim); }
 .dropzone--loaded { border-style: solid; border-color: var(--border); }
 
-.dropzone__icon { font-size: 32px; }
 .dropzone__label { font-size: 15px; font-weight: 500; }
 .dropzone__sub { color: var(--muted); font-size: 12px; }
 .dropzone__hint { color: var(--muted); font-size: 11px; margin-top: 4px; }
@@ -148,6 +148,9 @@ function basename(path: string) {
 }
 
 .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
   padding: 3px 10px;
   border-radius: 4px;
@@ -158,4 +161,7 @@ function basename(path: string) {
   color: var(--warning);
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
 </style>

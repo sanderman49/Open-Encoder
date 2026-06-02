@@ -10,6 +10,7 @@ import SettingsDrawer from '@/components/SettingsDrawer.vue'
 import JobQueue from '@/components/JobQueue.vue'
 import JobHistory from '@/components/JobHistory.vue'
 import type { VideoProbeResult } from '@/types/preset'
+import { Play, Loader2 } from 'lucide-vue-next'
 
 const presetsStore = usePresetsStore()
 const jobsStore = useJobsStore()
@@ -110,7 +111,9 @@ const canStart = () => !!selectedFile.value && !!outputDir.value && !starting.va
         :disabled="!canStart()"
         @click="handleStart"
       >
-        {{ starting ? 'Starting…' : '▶ Start Processing' }}
+        <Loader2 v-if="starting" :size="16" class="spin" />
+        <Play v-else :size="16" />
+        {{ starting ? 'Starting…' : 'Start Processing' }}
       </button>
 
       <JobQueue :jobs="jobsStore.activeJobs" @cancel="cancelJob" />
@@ -164,6 +167,9 @@ const canStart = () => !!selectedFile.value && !!outputDir.value && !starting.va
   padding: 12px;
   font-size: 15px;
 }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
 
 .start-error {
   color: var(--danger);
