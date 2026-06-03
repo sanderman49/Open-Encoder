@@ -11,61 +11,100 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-13   # Intel x86_64
+          - runner: macos-13
             triple: x86_64-apple-darwin
-          - runner: macos-14   # Apple Silicon arm64
+          - runner: macos-14
             triple: aarch64-apple-darwin
 
     runs-on: ${{ matrix.runner }}
 
+    env:
+      DEPS: ${{ github.workspace }}/deps
+
     steps:
-      - name: Install build dependencies
-        run: |
-          brew install nasm pkg-config \
-            x264 x265 libvpx \
-            lame libvorbis opus
+      - name: Install build tools
+        run: brew install nasm autoconf automake libtool
 
-      - name: Clone FFmpeg + SVT-AV1 sources
-        # All git operations before the dylib purge — Homebrew git links against libpcre2.
+      - name: Clone all sources
         run: |
-          git clone --depth=1 https://git.ffmpeg.org/ffmpeg.git
+          git clone --depth=1 https://github.com/xiph/ogg.git
+          git clone --depth=1 https://github.com/xiph/vorbis.git
+          git clone --depth=1 https://github.com/xiph/opus.git
+          git clone --depth=1 https://github.com/lameproject/lame.git
+          git clone --depth=1 https://code.videolan.org/videolan/x264.git
+          git clone --depth=1 https://bitbucket.org/multicoreware/x265_git.git
+          git clone --depth=1 https://chromium.googlesource.com/webm/libvpx.git
           git clone --depth=1 https://gitlab.com/AOMediaCodec/SVT-AV1.git
+          git clone --depth=1 https://git.ffmpeg.org/ffmpeg.git
 
-      - name: Build SVT-AV1 from source (static)
-        # Homebrew's svt-av1 is dylib-only; build a static .a ourselves.
+      - name: Build libogg
+        working-directory: ogg
+        run: |
+          autoreconf -fiv
+          ./configure --prefix="$DEPS" --enable-static --disable-shared
+          make -j$(sysctl -n hw.logicalcpu) install
+
+      - name: Build libvorbis
+        working-directory: vorbis
+        run: |
+          autoreconf -fiv
+          ./configure --prefix="$DEPS" --enable-static --disable-shared \
+            --with-ogg="$DEPS"
+          make -j$(sysctl -n hw.logicalcpu) install
+
+      - name: Build libopus
+        working-directory: opus
+        run: |
+          autoreconf -fiv
+          ./configure --prefix="$DEPS" --enable-static --disable-shared --disable-doc
+          make -j$(sysctl -n hw.logicalcpu) install
+
+      - name: Build libmp3lame
+        working-directory: lame
+        run: |
+          autoreconf -fiv || true
+          ./configure --prefix="$DEPS" --enable-static --disable-shared \
+            --disable-frontend
+          make -j$(sysctl -n hw.logicalcpu) install
+
+      - name: Build libx264
+        working-directory: x264
+        run: |
+          ./configure --prefix="$DEPS" --enable-static --disable-shared \
+            --disable-opencl --enable-pic
+          make -j$(sysctl -n hw.logicalcpu) install
+
+      - name: Build libx265
+        run: |
+          cmake -S x265_git/source -B x265_build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_SHARED=OFF \
+            -DCMAKE_INSTALL_PREFIX="$DEPS"
+          cmake --build x265_build -j$(sysctl -n hw.logicalcpu)
+          cmake --install x265_build
+
+      - name: Build libvpx
+        working-directory: libvpx
+        run: |
+          ./configure --prefix="$DEPS" --enable-static --disable-shared \
+            --disable-examples --disable-unit-tests --disable-tools
+          make -j$(sysctl -n hw.logicalcpu) install
+
+      - name: Build SVT-AV1
         run: |
           cmake -S SVT-AV1 -B SVT-AV1/Build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/svtav1_out"
+            -DCMAKE_INSTALL_PREFIX="$DEPS"
           cmake --build SVT-AV1/Build -j$(sysctl -n hw.logicalcpu)
           cmake --install SVT-AV1/Build
 
-      - name: Remove codec dylibs to force static linking
-        # Target only the codec libraries — tools like git and pkg-config need their own dylibs.
-        # Search the entire prefix (including opt/) to catch versioned files outside /lib.
-        run: |
-          prefix=$(brew --prefix)
-          find "$prefix" \( \
-            -name "libx264*.dylib" \
-            -o -name "libx265*.dylib" \
-            -o -name "libvpx*.dylib" \
-            -o -name "libSvtAv1Enc*.dylib" \
-            -o -name "libmp3lame*.dylib" \
-            -o -name "libvorbis*.dylib" \
-            -o -name "libvorbisenc*.dylib" \
-            -o -name "libvorbisfile*.dylib" \
-            -o -name "libogg*.dylib" \
-            -o -name "libopus*.dylib" \
-          \) -delete || true
-
-      - name: Configure
+      - name: Configure FFmpeg
         working-directory: ffmpeg
         run: |
-          prefix=$(brew --prefix)
-          export PKG_CONFIG_PATH="$GITHUB_WORKSPACE/svtav1_out/lib/pkgconfig:$prefix/lib/pkgconfig"
+          export PKG_CONFIG_PATH="$DEPS/lib/pkgconfig"
           ./configure \
-            --prefix="$GITHUB_WORKSPACE/ffmpeg_out" \
+            --prefix="${{ github.workspace }}/ffmpeg_out" \
             --enable-gpl \
             --enable-libx264 \
             --enable-libx265 \
@@ -77,8 +116,8 @@ jobs:
             --enable-videotoolbox \
             --enable-audiotoolbox \
             --enable-coreimage \
-            --extra-cflags="-I$prefix/include -I$GITHUB_WORKSPACE/svtav1_out/include" \
-            --extra-ldflags="-L$prefix/lib -L$GITHUB_WORKSPACE/svtav1_out/lib" \
+            --extra-cflags="-I$DEPS/include" \
+            --extra-ldflags="-L$DEPS/lib" \
             --pkg-config-flags="--static" \
             --disable-shared \
             --enable-static \
@@ -88,24 +127,23 @@ jobs:
             --disable-podpages \
             --disable-txtpages
 
-      - name: Build
+      - name: Build FFmpeg
         working-directory: ffmpeg
         run: make -j$(sysctl -n hw.logicalcpu)
 
-      - name: Install
+      - name: Install FFmpeg
         working-directory: ffmpeg
         run: make install
 
       - name: Package and verify
         run: |
           mkdir -p binaries
-          cp ffmpeg_out/bin/ffmpeg  binaries/ffmpeg-${{ matrix.triple }}
-          cp ffmpeg_out/bin/ffprobe binaries/ffprobe-${{ matrix.triple }}
-          chmod +x binaries/ffmpeg-${{ matrix.triple }}
-          chmod +x binaries/ffprobe-${{ matrix.triple }}
+          cp "${{ github.workspace }}/ffmpeg_out/bin/ffmpeg"  binaries/ffmpeg-${{ matrix.triple }}
+          cp "${{ github.workspace }}/ffmpeg_out/bin/ffprobe" binaries/ffprobe-${{ matrix.triple }}
+          chmod +x binaries/ffmpeg-${{ matrix.triple }} binaries/ffprobe-${{ matrix.triple }}
 
           echo "=== Version ==="
-          ./binaries/ffmpeg-${{ matrix.triple }} -version
+          binaries/ffmpeg-${{ matrix.triple }} -version
 
           echo "=== Dynamic deps ==="
           otool -L binaries/ffmpeg-${{ matrix.triple }}
