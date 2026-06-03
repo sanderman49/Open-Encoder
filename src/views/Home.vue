@@ -256,7 +256,7 @@ const canStart = () =>
 }
 .btn-processing {
   background: var(--elevated);
-  color: var(--muted);
+  color: var(--text);
   border: 1px solid var(--border);
   cursor: not-allowed;
 }

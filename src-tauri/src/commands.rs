@@ -193,7 +193,9 @@ pub async fn start_process(
     tauri::async_runtime::spawn(async move {
         let job_id = request.job_id.clone();
         if let Err(e) = run_process(app_clone.clone(), request, store).await {
-            let _ = app_clone.emit("job-error", ErrorEvent { job_id, error: e });
+            if e != "__cancelled__" {
+                let _ = app_clone.emit("job-error", ErrorEvent { job_id, error: e });
+            }
         }
     });
     Ok(())
@@ -384,7 +386,7 @@ async fn run_ffmpeg_loop(
             }
             Some(CommandEvent::Terminated(p)) => {
                 let was_cancelled = job_store.lock().unwrap().remove(store_key).is_none();
-                if was_cancelled { return Ok(()); }
+                if was_cancelled { return Err("__cancelled__".into()); }
                 if p.code != Some(0) {
                     let tail: String = stderr_buf.lines().rev().take(5)
                         .collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
