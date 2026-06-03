@@ -25,10 +25,15 @@ jobs:
             x264 x265 libvpx \
             lame libvorbis opus
 
+      - name: Clone FFmpeg + SVT-AV1 sources
+        # All git operations before the dylib purge — Homebrew git links against libpcre2.
+        run: |
+          git clone --depth=1 https://git.ffmpeg.org/ffmpeg.git
+          git clone --depth=1 https://gitlab.com/AOMediaCodec/SVT-AV1.git
+
       - name: Build SVT-AV1 from source (static)
         # Homebrew's svt-av1 is dylib-only; build a static .a ourselves.
         run: |
-          git clone --depth=1 https://gitlab.com/AOMediaCodec/SVT-AV1.git
           cmake -S SVT-AV1 -B SVT-AV1/Build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
@@ -38,12 +43,10 @@ jobs:
 
       - name: Remove dylibs to force static linking
         # Nuke ALL dylibs under the entire Homebrew prefix (including opt/ subdirs).
+        # Done after all git operations — Homebrew git itself needs libpcre2.dylib.
         # Runner is ephemeral so this is safe.
         run: |
           find "$(brew --prefix)" -name "*.dylib" -delete || true
-
-      - name: Clone FFmpeg
-        run: git clone --depth=1 https://git.ffmpeg.org/ffmpeg.git
 
       - name: Configure
         working-directory: ffmpeg
