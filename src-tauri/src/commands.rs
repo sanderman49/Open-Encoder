@@ -305,16 +305,6 @@ async fn run_process(
 
     job_store.lock().unwrap().insert(req.job_id.clone(), child);
 
-    // Emit 0% immediately so the job card shows "running" right away.
-    // If this never appears in the UI, the event system itself is broken.
-    let _ = app.emit("job-progress", ProgressEvent {
-        job_id: req.job_id.clone(),
-        phase: "video".to_string(),
-        percent: 0.0,
-        speed: "N/A".to_string(),
-        eta_seconds: 0.0,
-    });
-
     // Stream video progress — parse both stdout and stderr so we catch progress
     // regardless of which pipe FFmpeg actually uses.
     {
@@ -347,7 +337,10 @@ async fn run_process(
                 }
             }
             if done {
-                job_store.lock().unwrap().remove(&req.job_id);
+                let was_cancelled = job_store.lock().unwrap().remove(&req.job_id).is_none();
+                if was_cancelled {
+                    return Ok(());
+                }
                 if !exit_ok {
                     let tail: String = stderr_buf.lines().rev().take(5)
                         .collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
@@ -410,7 +403,10 @@ async fn run_process(
                 }
             }
             if done {
-                job_store.lock().unwrap().remove(&audio_key);
+                let was_cancelled = job_store.lock().unwrap().remove(&audio_key).is_none();
+                if was_cancelled {
+                    return Ok(());
+                }
                 if !exit_ok {
                     let tail: String = stderr_buf2.lines().rev().take(5)
                         .collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");

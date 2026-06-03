@@ -54,7 +54,7 @@ export const useJobsStore = defineStore('jobs', () => {
 
   function fail(payload: JobErrorPayload) {
     const job = jobs.value.find(j => j.id === payload.job_id)
-    if (!job) return
+    if (!job || job.status === 'cancelled') return
     job.status = 'failed'
     job.error = payload.error
     job.completedAt = Date.now()

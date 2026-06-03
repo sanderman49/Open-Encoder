@@ -21,6 +21,9 @@
     "store:allow-delete",
     "store:allow-keys",
     "store:allow-save",
-    "store:allow-load"
+    "store:allow-load",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "core:webview:allow-internal-toggle-devtools"
   ]
 }
