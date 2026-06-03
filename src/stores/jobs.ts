@@ -15,11 +15,12 @@ export const useJobsStore = defineStore('jobs', () => {
       .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)),
   )
 
-  function addJob(id: string, inputPath: string) {
+  function addJob(id: string, inputPath: string, outputName: string) {
     jobs.value.push({
       id,
       status: 'queued',
       inputPath,
+      outputName,
       videoOutput: '',
       videoPercent: 0,
       audioPercent: 0,

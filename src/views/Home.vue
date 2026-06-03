@@ -114,6 +114,7 @@ async function handleStart() {
       outputConfig,
       probe: probeResult.value,
       title: videoTitle.value,
+      outputName: titleLocked.value ? expandedOverride.value : videoTitle.value,
     })
   } catch (e: unknown) {
     startError.value = e instanceof Error ? e.message : String(e)

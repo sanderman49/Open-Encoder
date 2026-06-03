@@ -18,7 +18,10 @@ function basename(p: string) { return p.split(/[/\\]/).pop() ?? p }
     <p class="section-title">Processing</p>
     <div v-for="job in jobs" :key="job.id" class="job-card">
       <div class="job-header">
-        <span class="job-name">{{ basename(job.inputPath) }}</span>
+        <div class="job-names">
+          <span class="job-name">{{ basename(job.inputPath) }}</span>
+          <span v-if="job.outputName && job.outputName !== basename(job.inputPath).replace(/\.[^.]+$/, '')" class="job-output-name">→ {{ job.outputName }}</span>
+        </div>
         <button class="btn btn-ghost cancel-btn" @click="$emit('cancel', job.id)">Cancel</button>
       </div>
 
@@ -61,13 +64,26 @@ function basename(p: string) { return p.split(/[/\\]/).pop() ?? p }
   justify-content: space-between;
   margin-bottom: 10px;
 }
+.job-names {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 70%;
+}
 .job-name {
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 70%;
+}
+.job-output-name {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .cancel-btn { font-size: 12px; padding: 4px 10px; color: var(--danger); border-color: var(--danger); }
 .cancel-btn:hover { background: rgba(239, 68, 68, 0.1); }

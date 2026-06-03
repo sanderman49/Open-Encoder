@@ -4,6 +4,7 @@ export interface Job {
   id: string
   status: JobStatus
   inputPath: string
+  outputName: string
   videoOutput: string
   audioOutput?: string
   videoPercent: number
