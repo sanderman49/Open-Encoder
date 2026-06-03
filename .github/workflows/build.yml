@@ -13,12 +13,18 @@ jobs:
         include:
           - os: ubuntu-latest
             triple: x86_64-unknown-linux-gnu
-          - os: macos-13
-            triple: x86_64-apple-darwin
+            bundles: deb
+            artifact: app-linux-deb
+          - os: ubuntu-latest
+            triple: x86_64-unknown-linux-gnu
+            bundles: appimage
+            artifact: app-linux-appimage
           - os: macos-14
             triple: aarch64-apple-darwin
+            artifact: app-macos
           - os: windows-latest
             triple: x86_64-pc-windows-msvc
+            artifact: app-windows
 
     runs-on: ${{ matrix.os }}
 
@@ -68,12 +74,20 @@ jobs:
         run: npm ci
 
       - name: Build app
-        run: npm run tauri:build
+        shell: bash
+        run: |
+          if [ -n "$BUNDLES" ]; then
+            npm run tauri:build -- --bundles "$BUNDLES"
+          else
+            npm run tauri:build
+          fi
+        env:
+          BUNDLES: ${{ matrix.bundles }}
 
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
-          name: app-${{ matrix.triple }}
+          name: ${{ matrix.artifact }}
           retention-days: 30
           path: |
             src-tauri/target/release/bundle/**/*.deb
