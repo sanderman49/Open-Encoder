@@ -51,6 +51,7 @@ jobs:
         working-directory: vorbis
         run: |
           autoreconf -fiv
+          sed -i '' 's/-force_cpusubtype_ALL//g' configure
           ./configure --prefix="$DEPS" --enable-static --disable-shared \
             --with-ogg="$DEPS"
           make -j$(sysctl -n hw.logicalcpu) install
