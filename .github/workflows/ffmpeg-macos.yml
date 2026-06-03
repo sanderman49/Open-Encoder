@@ -25,6 +25,9 @@ jobs:
       - name: Install build tools
         run: brew install nasm autoconf automake libtool
 
+      - name: Set PKG_CONFIG_PATH
+        run: echo "PKG_CONFIG_PATH=$DEPS/lib/pkgconfig" >> $GITHUB_ENV
+
       - name: Clone all sources
         run: |
           git clone --depth=1 https://github.com/xiph/ogg.git
@@ -102,7 +105,6 @@ jobs:
       - name: Configure FFmpeg
         working-directory: ffmpeg
         run: |
-          export PKG_CONFIG_PATH="$DEPS/lib/pkgconfig"
           ./configure \
             --prefix="${{ github.workspace }}/ffmpeg_out" \
             --enable-gpl \
