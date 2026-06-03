@@ -145,7 +145,10 @@ jobs:
             --disable-indev=x11grab \
             --disable-indev=xcbgrab \
             --disable-xlib \
-            --disable-xcb \
+            --disable-libxcb \
+            --disable-libxcb-shm \
+            --disable-libxcb-xfixes \
+            --disable-libxcb-shape \
             --extra-cflags="-I$DEPS/include" \
             --extra-ldflags="-L$DEPS/lib" \
             --pkg-config-flags="--static" \
