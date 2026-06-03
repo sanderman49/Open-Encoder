@@ -29,6 +29,19 @@ const startError = ref<string | null>(null)
 const nameOverride = computed(() => presetsStore.currentConfig.output.nameOverride)
 const titleLocked = computed(() => !!nameOverride.value)
 
+const expandedOverride = computed(() => {
+  const v = nameOverride.value
+  if (!v) return ''
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  const time = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
+  return v
+    .replace(/\$DATETIME/g, `${date}_${time}`)
+    .replace(/\$DATE/g, date)
+    .replace(/\$TIME/g, time)
+})
+
 // If preset has a video dir configured, use it and lock the field
 const presetVideoDir = computed(() => presetsStore.currentConfig.output.videoDir)
 const outputDirLocked = computed(() => presetVideoDir.value.length > 0)
@@ -122,7 +135,7 @@ const canStart = () =>
 
       <div class="title-row">
         <input
-          :value="titleLocked ? nameOverride : videoTitle"
+          :value="titleLocked ? expandedOverride : videoTitle"
           :disabled="titleLocked"
           class="title-input"
           :class="{ 'title-locked': titleLocked }"
