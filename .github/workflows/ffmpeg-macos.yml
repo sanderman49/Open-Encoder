@@ -94,18 +94,18 @@ jobs:
           # If .pc still missing, write a minimal one so FFmpeg configure can find it
           if [ ! -f "$DEPS/lib/pkgconfig/x265.pc" ]; then
             X265_VER=$(grep -r "X265_BUILD" x265_git/source/CMakeLists.txt | grep -o '[0-9]\+' | head -1)
-            cat > "$DEPS/lib/pkgconfig/x265.pc" <<PCEOF
-prefix=$DEPS
-exec_prefix=\${prefix}
-libdir=\${prefix}/lib
-includedir=\${prefix}/include
-Name: x265
-Description: H.265/HEVC video encoder
-Version: ${X265_VER:-210}
-Libs: -L\${libdir} -lx265
-Libs.private: -lc++ -lpthread -lm
-Cflags: -I\${includedir}
-PCEOF
+            {
+              echo "prefix=$DEPS"
+              echo 'exec_prefix=${prefix}'
+              echo 'libdir=${prefix}/lib'
+              echo 'includedir=${prefix}/include'
+              echo 'Name: x265'
+              echo 'Description: H.265/HEVC video encoder'
+              echo "Version: ${X265_VER:-210}"
+              echo 'Libs: -L${libdir} -lx265'
+              echo 'Libs.private: -lc++ -lpthread -lm'
+              echo 'Cflags: -I${includedir}'
+            } > "$DEPS/lib/pkgconfig/x265.pc"
           fi
 
       - name: Build libvpx
