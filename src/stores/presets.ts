@@ -45,7 +45,7 @@ export const usePresetsStore = defineStore('presets', () => {
       if (saved) userPresets.value = saved.map(p => ({
         ...p,
         video: backfillVideo(p.video as Partial<VideoConfig>),
-        output: p.output ?? { ...DEFAULT_OUTPUT_CONFIG },
+        output: { ...DEFAULT_OUTPUT_CONFIG, ...(p.output ?? {}) },
       }))
       const savedId = await store.get<string>('activePresetId')
       const target = savedId ? allPresets.value.find(p => p.id === savedId) : null

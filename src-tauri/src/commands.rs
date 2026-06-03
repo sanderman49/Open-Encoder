@@ -59,9 +59,12 @@ pub struct AudioExportConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutputConfig {
+    #[serde(default)]
     pub video_dir: String,
-    pub audio_dir: String,   // relative to video output dir; empty = same folder
-    pub name_override: String, // full filename stem; supports $DATE $TIME $DATETIME. empty = use req.title
+    #[serde(default)]
+    pub audio_dir: String,
+    #[serde(default)]
+    pub name_override: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
