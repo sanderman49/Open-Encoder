@@ -303,55 +303,10 @@ async fn run_process(
 
     job_store.lock().unwrap().insert(req.job_id.clone(), child);
 
-    // Stream video progress — parse both stdout and stderr so we catch progress
-    // regardless of which pipe FFmpeg actually uses.
-    {
-        let mut line_buf = String::new();
-        let mut block: HashMap<String, String> = HashMap::new();
-        let mut stderr_buf = String::new();
-        loop {
-            let (bytes, is_stderr, done, exit_ok) = match rx.recv().await {
-                Some(CommandEvent::Stdout(b)) => (Some(b), false, false, true),
-                Some(CommandEvent::Stderr(b)) => (Some(b), true, false, true),
-                Some(CommandEvent::Terminated(p)) => (None, false, true, p.code == Some(0)),
-                None => (None, false, true, true),
-                _ => (None, false, false, true),
-            };
-            if let Some(b) = bytes {
-                let text = String::from_utf8_lossy(&b).to_string();
-                if is_stderr { stderr_buf.push_str(&text); }
-                line_buf.push_str(&text);
-                while let Some(nl) = line_buf.find('\n') {
-                    let line = line_buf[..nl].trim().to_string();
-                    line_buf.drain(..=nl);
-                    if line.is_empty() { continue; }
-                    if let Some((k, v)) = line.split_once('=') {
-                        block.insert(k.to_string(), v.trim().to_string());
-                    }
-                    if line.starts_with("progress=") {
-                        emit_progress(&app, &block, req.probe.duration, &req.job_id, "video");
-                        block.clear();
-                    }
-                }
-            }
-            if done {
-                let was_cancelled = job_store.lock().unwrap().remove(&req.job_id).is_none();
-                if was_cancelled {
-                    return Ok(());
-                }
-                if !exit_ok {
-                    let tail: String = stderr_buf.lines().rev().take(5)
-                        .collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
-                    return Err(if tail.is_empty() {
-                        "FFmpeg (video) exited with non-zero code".into()
-                    } else {
-                        format!("FFmpeg (video) error:\n{}", tail)
-                    });
-                }
-                break;
-            }
-        }
-    }
+    run_ffmpeg_loop(
+        &mut rx, &app, &job_store,
+        req.probe.duration, &req.job_id, &req.job_id, "video",
+    ).await?;
 
     // ── Audio export pass ────────────────────────────────────────────────────
     let audio_out = if let Some(ref cfg) = req.audio_export {
@@ -372,51 +327,10 @@ async fn run_process(
 
         job_store.lock().unwrap().insert(audio_key.clone(), child2);
 
-        let mut line_buf2 = String::new();
-        let mut block2: HashMap<String, String> = HashMap::new();
-        let mut stderr_buf2 = String::new();
-        loop {
-            let (bytes, is_stderr, done, exit_ok) = match rx2.recv().await {
-                Some(CommandEvent::Stdout(b)) => (Some(b), false, false, true),
-                Some(CommandEvent::Stderr(b)) => (Some(b), true, false, true),
-                Some(CommandEvent::Terminated(p)) => (None, false, true, p.code == Some(0)),
-                None => (None, false, true, true),
-                _ => (None, false, false, true),
-            };
-            if let Some(b) = bytes {
-                let text = String::from_utf8_lossy(&b).to_string();
-                if is_stderr { stderr_buf2.push_str(&text); }
-                line_buf2.push_str(&text);
-                while let Some(nl) = line_buf2.find('\n') {
-                    let line = line_buf2[..nl].trim().to_string();
-                    line_buf2.drain(..=nl);
-                    if line.is_empty() { continue; }
-                    if let Some((k, v)) = line.split_once('=') {
-                        block2.insert(k.to_string(), v.trim().to_string());
-                    }
-                    if line.starts_with("progress=") {
-                        emit_progress(&app, &block2, req.probe.duration, &req.job_id, "audio");
-                        block2.clear();
-                    }
-                }
-            }
-            if done {
-                let was_cancelled = job_store.lock().unwrap().remove(&audio_key).is_none();
-                if was_cancelled {
-                    return Ok(());
-                }
-                if !exit_ok {
-                    let tail: String = stderr_buf2.lines().rev().take(5)
-                        .collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
-                    return Err(if tail.is_empty() {
-                        "FFmpeg (audio) exited with non-zero code".into()
-                    } else {
-                        format!("FFmpeg (audio) error:\n{}", tail)
-                    });
-                }
-                break;
-            }
-        }
+        run_ffmpeg_loop(
+            &mut rx2, &app, &job_store,
+            req.probe.duration, &audio_key, &req.job_id, "audio",
+        ).await?;
 
         Some(out)
     } else {
@@ -433,6 +347,59 @@ async fn run_process(
     );
 
     Ok(())
+}
+
+async fn run_ffmpeg_loop(
+    rx: &mut tauri::async_runtime::Receiver<CommandEvent>,
+    app: &AppHandle,
+    job_store: &Arc<Mutex<HashMap<String, CommandChild>>>,
+    duration: f64,
+    store_key: &str,
+    event_job_id: &str,
+    phase: &str,
+) -> Result<(), String> {
+    let mut stdout_buf = String::new();
+    let mut block: HashMap<String, String> = HashMap::new();
+    let mut stderr_buf = String::new();
+
+    loop {
+        match rx.recv().await {
+            Some(CommandEvent::Stdout(b)) => {
+                stdout_buf.push_str(&String::from_utf8_lossy(&b));
+                while let Some(nl) = stdout_buf.find('\n') {
+                    let line = stdout_buf[..nl].trim().to_string();
+                    stdout_buf.drain(..=nl);
+                    if line.is_empty() { continue; }
+                    if let Some((k, v)) = line.split_once('=') {
+                        block.insert(k.to_string(), v.trim().to_string());
+                    }
+                    if line.starts_with("progress=") {
+                        emit_progress(app, &block, duration, event_job_id, phase);
+                        block.clear();
+                    }
+                }
+            }
+            Some(CommandEvent::Stderr(b)) => {
+                stderr_buf.push_str(&String::from_utf8_lossy(&b));
+            }
+            Some(CommandEvent::Terminated(p)) => {
+                let was_cancelled = job_store.lock().unwrap().remove(store_key).is_none();
+                if was_cancelled { return Ok(()); }
+                if p.code != Some(0) {
+                    let tail: String = stderr_buf.lines().rev().take(5)
+                        .collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+                    return Err(if tail.is_empty() {
+                        format!("FFmpeg ({phase}) exited with non-zero code")
+                    } else {
+                        format!("FFmpeg ({phase}) error:\n{tail}")
+                    });
+                }
+                return Ok(());
+            }
+            None => return Ok(()),
+            _ => {}
+        }
+    }
 }
 
 fn parse_out_time(s: &str) -> Option<f64> {
