@@ -19,6 +19,10 @@ jobs:
             triple: x86_64-unknown-linux-gnu
             bundles: appimage
             artifact: app-linux-appimage
+          - os: ubuntu-latest
+            triple: x86_64-unknown-linux-gnu
+            bundles: rpm
+            artifact: app-linux-rpm
           - os: macos-14
             triple: aarch64-apple-darwin
             artifact: app-macos
@@ -91,6 +95,7 @@ jobs:
           retention-days: 30
           path: |
             src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.rpm
             src-tauri/target/release/bundle/**/*.AppImage
             src-tauri/target/release/bundle/**/*.dmg
             src-tauri/target/release/bundle/**/*.msi
