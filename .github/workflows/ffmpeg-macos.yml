@@ -87,16 +87,26 @@ jobs:
             -DCMAKE_INSTALL_LIBDIR=lib
           cmake --build x265_build -j$(sysctl -n hw.logicalcpu)
           cmake --install x265_build
-
-      - name: Verify x265 pkg-config
-        run: |
-          echo "=== installed pkgconfig files ==="
-          ls "$DEPS/lib/pkgconfig/" 2>/dev/null || echo "(none)"
-          ls "$DEPS/lib64/pkgconfig/" 2>/dev/null || echo "(no lib64)"
-          echo "=== x265.pc ==="
-          cat "$DEPS/lib/pkgconfig/x265.pc" 2>/dev/null || cat "$DEPS/lib64/pkgconfig/x265.pc" 2>/dev/null || echo "x265.pc NOT FOUND"
-          echo "=== pkg-config probe ==="
-          PKG_CONFIG_PATH="$DEPS/lib/pkgconfig:$DEPS/lib64/pkgconfig" pkg-config --static --exists x265 && echo "x265 OK" || echo "x265 MISSING"
+          # cmake --install may not install the .pc file on all cmake versions;
+          # copy directly from the build dir where configure_file() always writes it.
+          mkdir -p "$DEPS/lib/pkgconfig"
+          cp x265_build/x265.pc "$DEPS/lib/pkgconfig/x265.pc" 2>/dev/null || true
+          # If .pc still missing, write a minimal one so FFmpeg configure can find it
+          if [ ! -f "$DEPS/lib/pkgconfig/x265.pc" ]; then
+            X265_VER=$(grep -r "X265_BUILD" x265_git/source/CMakeLists.txt | grep -o '[0-9]\+' | head -1)
+            cat > "$DEPS/lib/pkgconfig/x265.pc" <<PCEOF
+prefix=$DEPS
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+Name: x265
+Description: H.265/HEVC video encoder
+Version: ${X265_VER:-210}
+Libs: -L\${libdir} -lx265
+Libs.private: -lc++ -lpthread -lm
+Cflags: -I\${includedir}
+PCEOF
+          fi
 
       - name: Build libvpx
         working-directory: libvpx
