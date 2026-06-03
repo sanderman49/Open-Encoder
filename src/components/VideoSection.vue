@@ -36,16 +36,28 @@ const PRESETS: EncodePreset[] = [
   'ultrafast','superfast','veryfast','faster','fast','medium','slow','slower','veryslow',
 ]
 
-const HW_ACCELS: { value: HwAccel; label: string }[] = [
-  { value: 'none',          label: 'None (software)' },
-  { value: 'nvenc',         label: 'NVENC (Nvidia)' },
-  { value: 'amf',           label: 'AMF (AMD)' },
-  { value: 'qsv',           label: 'Quick Sync (Intel)' },
-  { value: 'videotoolbox',  label: 'VideoToolbox (Apple/Metal)' },
-  { value: 'vaapi',         label: 'VAAPI (AMD/Intel Linux)' },
+const ua = navigator.userAgent.toLowerCase()
+const isMac     = ua.includes('macintosh') || ua.includes('mac os')
+const isWindows = ua.includes('windows')
+// Linux = everything else (including Linux in the UA)
+
+const ALL_HW_ACCELS: { value: HwAccel; label: string; os: ('mac' | 'windows' | 'linux')[] }[] = [
+  { value: 'nvenc',        label: 'NVENC (Nvidia)',           os: ['windows', 'linux'] },
+  { value: 'amf',          label: 'AMF (AMD)',                os: ['windows'] },
+  { value: 'qsv',          label: 'Quick Sync (Intel)',       os: ['windows', 'linux'] },
+  { value: 'videotoolbox', label: 'VideoToolbox (Apple)',     os: ['mac'] },
+  { value: 'vaapi',        label: 'VAAPI (AMD/Intel Linux)',  os: ['linux'] },
 ]
 
+const currentOs = isMac ? 'mac' : isWindows ? 'windows' : 'linux'
+const HW_ACCELS = ALL_HW_ACCELS.filter(h => h.os.includes(currentOs))
+
 const validContainers = computed(() => CODEC_CONTAINERS[v.value.codec] ?? [])
+
+// Reset hwAccel if current value isn't available on this OS
+if (v.value.hwAccel !== 'none' && !HW_ACCELS.find(h => h.value === v.value.hwAccel)) {
+  v.value.hwAccel = 'none'
+}
 const showCrf = computed(() => v.value.codec !== 'copy')
 const showEncodePreset = computed(() => !['libvp9', 'libsvtav1', 'copy'].includes(v.value.codec))
 const showCustomRes = computed(() => v.value.resolution === 'custom')
