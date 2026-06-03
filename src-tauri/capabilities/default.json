@@ -24,6 +24,8 @@
     "store:allow-load",
     "core:event:allow-listen",
     "core:event:allow-emit",
-    "core:webview:allow-internal-toggle-devtools"
+    "core:webview:allow-internal-toggle-devtools",
+    "os:allow-platform",
+    "os:allow-os-type"
   ]
 }

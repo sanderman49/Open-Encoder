@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { platform } from '@tauri-apps/plugin-os'
 import { usePresetsStore } from '@/stores/presets'
 import { CODEC_CONTAINERS } from '@/types/preset'
 import type { VideoCodec, Container, Resolution, EncodePreset, HwAccel } from '@/types/preset'
@@ -36,28 +37,25 @@ const PRESETS: EncodePreset[] = [
   'ultrafast','superfast','veryfast','faster','fast','medium','slow','slower','veryslow',
 ]
 
-const ua = navigator.userAgent.toLowerCase()
-const isMac     = ua.includes('macintosh') || ua.includes('mac os')
-const isWindows = ua.includes('windows')
-// Linux = everything else (including Linux in the UA)
-
-const ALL_HW_ACCELS: { value: HwAccel; label: string; os: ('mac' | 'windows' | 'linux')[] }[] = [
+const ALL_HW_ACCELS: { value: HwAccel; label: string; os: string[] }[] = [
   { value: 'nvenc',        label: 'NVENC (Nvidia)',           os: ['windows', 'linux'] },
   { value: 'amf',          label: 'AMF (AMD)',                os: ['windows'] },
   { value: 'qsv',          label: 'Quick Sync (Intel)',       os: ['windows', 'linux'] },
-  { value: 'videotoolbox', label: 'VideoToolbox (Apple)',     os: ['mac'] },
+  { value: 'videotoolbox', label: 'VideoToolbox (Apple)',     os: ['macos'] },
   { value: 'vaapi',        label: 'VAAPI (AMD/Intel Linux)',  os: ['linux'] },
 ]
 
-const currentOs = isMac ? 'mac' : isWindows ? 'windows' : 'linux'
-const HW_ACCELS = ALL_HW_ACCELS.filter(h => h.os.includes(currentOs))
+const currentOs = ref('linux')
+const HW_ACCELS = computed(() => ALL_HW_ACCELS.filter(h => h.os.includes(currentOs.value)))
+
+onMounted(async () => {
+  currentOs.value = await platform()
+  if (v.value.hwAccel !== 'none' && !HW_ACCELS.value.find(h => h.value === v.value.hwAccel)) {
+    v.value.hwAccel = 'none'
+  }
+})
 
 const validContainers = computed(() => CODEC_CONTAINERS[v.value.codec] ?? [])
-
-// Reset hwAccel if current value isn't available on this OS
-if (v.value.hwAccel !== 'none' && !HW_ACCELS.find(h => h.value === v.value.hwAccel)) {
-  v.value.hwAccel = 'none'
-}
 const showCrf = computed(() => v.value.codec !== 'copy')
 const showEncodePreset = computed(() => !['libvp9', 'libsvtav1', 'copy'].includes(v.value.codec))
 const showCustomRes = computed(() => v.value.resolution === 'custom')
