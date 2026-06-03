@@ -63,6 +63,7 @@ jobs:
         working-directory: ffmpeg
         run: |
           prefix=$(brew --prefix)
+          export PKG_CONFIG_PATH="$GITHUB_WORKSPACE/svtav1_out/lib/pkgconfig:$prefix/lib/pkgconfig"
           ./configure \
             --prefix="$GITHUB_WORKSPACE/ffmpeg_out" \
             --enable-gpl \
