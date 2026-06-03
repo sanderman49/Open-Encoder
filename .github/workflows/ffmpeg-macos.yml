@@ -22,14 +22,25 @@ jobs:
       - name: Install build dependencies
         run: |
           brew install nasm pkg-config \
-            x264 x265 libvpx svt-av1 \
+            x264 x265 libvpx \
             lame libvorbis opus
 
-      - name: Remove dylibs to force static linking
-        # Remove ALL dylibs from Homebrew prefix — runner is ephemeral so this is safe.
-        # This catches transitive dependencies that selective removal misses.
+      - name: Build SVT-AV1 from source (static)
+        # Homebrew's svt-av1 is dylib-only; build a static .a ourselves.
         run: |
-          find "$(brew --prefix)/lib" -name "*.dylib" -delete || true
+          git clone --depth=1 https://gitlab.com/AOMediaCodec/SVT-AV1.git
+          cmake -S SVT-AV1 -B SVT-AV1/Build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/svtav1_out"
+          cmake --build SVT-AV1/Build -j$(sysctl -n hw.logicalcpu)
+          cmake --install SVT-AV1/Build
+
+      - name: Remove dylibs to force static linking
+        # Nuke ALL dylibs under the entire Homebrew prefix (including opt/ subdirs).
+        # Runner is ephemeral so this is safe.
+        run: |
+          find "$(brew --prefix)" -name "*.dylib" -delete || true
 
       - name: Clone FFmpeg
         run: git clone --depth=1 https://git.ffmpeg.org/ffmpeg.git
@@ -51,8 +62,8 @@ jobs:
             --enable-videotoolbox \
             --enable-audiotoolbox \
             --enable-coreimage \
-            --extra-cflags="-I$prefix/include" \
-            --extra-ldflags="-L$prefix/lib" \
+            --extra-cflags="-I$prefix/include -I$GITHUB_WORKSPACE/svtav1_out/include" \
+            --extra-ldflags="-L$prefix/lib -L$GITHUB_WORKSPACE/svtav1_out/lib" \
             --pkg-config-flags="--static" \
             --disable-shared \
             --enable-static \
