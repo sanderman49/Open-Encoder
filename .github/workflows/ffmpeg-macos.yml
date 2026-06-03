@@ -88,6 +88,16 @@ jobs:
           cmake --build x265_build -j$(sysctl -n hw.logicalcpu)
           cmake --install x265_build
 
+      - name: Verify x265 pkg-config
+        run: |
+          echo "=== installed pkgconfig files ==="
+          ls "$DEPS/lib/pkgconfig/" 2>/dev/null || echo "(none)"
+          ls "$DEPS/lib64/pkgconfig/" 2>/dev/null || echo "(no lib64)"
+          echo "=== x265.pc ==="
+          cat "$DEPS/lib/pkgconfig/x265.pc" 2>/dev/null || cat "$DEPS/lib64/pkgconfig/x265.pc" 2>/dev/null || echo "x265.pc NOT FOUND"
+          echo "=== pkg-config probe ==="
+          PKG_CONFIG_PATH="$DEPS/lib/pkgconfig:$DEPS/lib64/pkgconfig" pkg-config --static --exists x265 && echo "x265 OK" || echo "x265 MISSING"
+
       - name: Build libvpx
         working-directory: libvpx
         run: |
@@ -108,6 +118,7 @@ jobs:
       - name: Configure FFmpeg
         working-directory: ffmpeg
         run: |
+          PKG_CONFIG_PATH="$DEPS/lib/pkgconfig:$DEPS/lib64/pkgconfig" \
           ./configure \
             --prefix="${{ github.workspace }}/ffmpeg_out" \
             --enable-gpl \
