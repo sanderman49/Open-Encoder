@@ -26,20 +26,10 @@ jobs:
             lame libvorbis opus
 
       - name: Remove dylibs to force static linking
-        # Deleting dylibs makes the linker fall back to .a files.
-        # Runner is ephemeral so this is safe.
+        # Remove ALL dylibs from Homebrew prefix — runner is ephemeral so this is safe.
+        # This catches transitive dependencies that selective removal misses.
         run: |
-          prefix=$(brew --prefix)
-          for lib in \
-            libx264 libx265 \
-            libvpx \
-            libSvtAv1Enc \
-            libmp3lame \
-            libvorbis libvorbisenc libvorbisfile libogg \
-            libopus; do
-            rm -f "$prefix"/lib/${lib}.dylib \
-                  "$prefix"/lib/${lib}.*.dylib 2>/dev/null || true
-          done
+          find "$(brew --prefix)/lib" -name "*.dylib" -delete || true
 
       - name: Clone FFmpeg
         run: git clone --depth=1 https://git.ffmpeg.org/ffmpeg.git
@@ -112,3 +102,16 @@ jobs:
           name: ffmpeg-${{ matrix.triple }}
           path: binaries/
           retention-days: 90
+
+      - name: Publish to ffmpeg-bins release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ffmpeg-bins \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "FFmpeg Binaries" \
+            --notes "Pre-built static FFmpeg binaries. Updated automatically." \
+            --prerelease 2>/dev/null || true
+          gh release upload ffmpeg-bins binaries/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber

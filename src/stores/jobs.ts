@@ -67,5 +67,9 @@ export const useJobsStore = defineStore('jobs', () => {
     job.completedAt = Date.now()
   }
 
-  return { jobs, activeJobs, completedJobs, addJob, updateProgress, complete, fail, cancel }
+  function clearHistory() {
+    jobs.value = jobs.value.filter(j => j.status === 'queued' || j.status === 'running')
+  }
+
+  return { jobs, activeJobs, completedJobs, addJob, updateProgress, complete, fail, cancel, clearHistory }
 })

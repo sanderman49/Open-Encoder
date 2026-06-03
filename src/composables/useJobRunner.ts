@@ -7,10 +7,11 @@ import type { JobProgressPayload, JobCompletePayload, JobErrorPayload } from '@/
 
 export interface StartProcessArgs {
   inputPath: string
-  outputDir: string
   video: object
   audioExport: object | null
+  outputConfig: object
   probe: VideoProbeResult
+  title: string
 }
 
 export function useJobRunner() {
@@ -37,11 +38,12 @@ export function useJobRunner() {
     await invoke('start_process', {
       request: {
         input_path: args.inputPath,
-        output_dir: args.outputDir,
         video: args.video,
         audio_export: args.audioExport,
+        output_config: args.outputConfig,
         job_id: jobId,
         probe: args.probe,
+        title: args.title,
       },
     })
     return jobId

@@ -86,6 +86,8 @@ label { color: var(--muted); font-size: 12px; user-select: none; }
   border: 1px solid var(--border);
 }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-ghost:disabled:hover { border-color: var(--border); color: var(--text); }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-danger:hover { background: #dc2626; }
 

@@ -38,7 +38,7 @@ async function handlePath(path: string) {
 
 async function onDrop(e: DragEvent) {
   dragging.value = false
-  const path = e.dataTransfer?.files?.[0]?.path
+  const path = (e.dataTransfer?.files?.[0] as unknown as { path?: string })?.path
   if (path) await handlePath(path)
 }
 

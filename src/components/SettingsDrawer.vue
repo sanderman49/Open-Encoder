@@ -2,6 +2,7 @@
 import VideoSection from './VideoSection.vue'
 import DeinterlaceSection from './DeinterlaceSection.vue'
 import AudioExportSection from './AudioExportSection.vue'
+import OutputSection from './OutputSection.vue'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
@@ -26,6 +27,8 @@ function close() { emit('update:open', false) }
           <DeinterlaceSection />
           <div class="divider" />
           <AudioExportSection />
+          <div class="divider" />
+          <OutputSection />
         </div>
       </aside>
     </Transition>

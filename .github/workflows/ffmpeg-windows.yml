@@ -35,3 +35,17 @@ jobs:
           name: ffmpeg-x86_64-pc-windows-msvc
           path: binaries\
           retention-days: 90
+
+      - name: Publish to ffmpeg-bins release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release create ffmpeg-bins \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "FFmpeg Binaries" \
+            --notes "Pre-built static FFmpeg binaries. Updated automatically." \
+            --prerelease 2>/dev/null || true
+          gh release upload ffmpeg-bins binaries/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber

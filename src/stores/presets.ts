@@ -1,16 +1,25 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { load } from '@tauri-apps/plugin-store'
-import type { Preset, VideoConfig, AudioExportConfig } from '@/types/preset'
-import { BUILTIN_PRESETS, DEFAULT_VIDEO_CONFIG } from '@/types/preset'
+import type { Preset, VideoConfig, AudioExportConfig, OutputConfig } from '@/types/preset'
+import { BUILTIN_PRESETS, DEFAULT_VIDEO_CONFIG, DEFAULT_OUTPUT_CONFIG } from '@/types/preset'
+
+function backfillVideo(v: Partial<VideoConfig>): VideoConfig {
+  return {
+    ...DEFAULT_VIDEO_CONFIG,
+    ...v,
+    deinterlace: { ...DEFAULT_VIDEO_CONFIG.deinterlace, ...(v?.deinterlace ?? {}) },
+  }
+}
 
 export const usePresetsStore = defineStore('presets', () => {
   const userPresets = ref<Preset[]>([])
   const activePresetId = ref<string>(BUILTIN_PRESETS[0].id)
 
-  const currentConfig = ref<{ video: VideoConfig; audioExport: AudioExportConfig | null }>({
+  const currentConfig = ref<{ video: VideoConfig; audioExport: AudioExportConfig | null; output: OutputConfig }>({
     video: { ...DEFAULT_VIDEO_CONFIG, deinterlace: { ...DEFAULT_VIDEO_CONFIG.deinterlace } },
     audioExport: null,
+    output: { ...DEFAULT_OUTPUT_CONFIG },
   })
 
   const allPresets = computed(() => [...BUILTIN_PRESETS, ...userPresets.value])
@@ -19,23 +28,32 @@ export const usePresetsStore = defineStore('presets', () => {
     () => allPresets.value.find(p => p.id === activePresetId.value) ?? allPresets.value[0],
   )
 
-  function applyPreset(preset: Preset) {
+  function applyPreset(preset: Preset, save = false) {
     activePresetId.value = preset.id
     currentConfig.value = {
       video: JSON.parse(JSON.stringify(preset.video)),
       audioExport: preset.audioExport ? JSON.parse(JSON.stringify(preset.audioExport)) : null,
+      output: JSON.parse(JSON.stringify(preset.output ?? DEFAULT_OUTPUT_CONFIG)),
     }
+    if (save) persist()
   }
 
   async function load_() {
     try {
-      const store = await load('presets.json', { autoSave: false })
+      const store = await load('presets.json', { autoSave: false } as Parameters<typeof load>[1])
       const saved = await store.get<Preset[]>('presets')
-      if (saved) userPresets.value = saved
+      if (saved) userPresets.value = saved.map(p => ({
+        ...p,
+        video: backfillVideo(p.video as Partial<VideoConfig>),
+        output: p.output ?? { ...DEFAULT_OUTPUT_CONFIG },
+      }))
+      const savedId = await store.get<string>('activePresetId')
+      const target = savedId ? allPresets.value.find(p => p.id === savedId) : null
+      applyPreset(target ?? allPresets.value[0])
     } catch {
       // First run — no store yet
+      applyPreset(allPresets.value[0])
     }
-    applyPreset(allPresets.value[0])
   }
 
   async function saveCurrentAsPreset(name: string) {
@@ -47,6 +65,7 @@ export const usePresetsStore = defineStore('presets', () => {
       audioExport: currentConfig.value.audioExport
         ? JSON.parse(JSON.stringify(currentConfig.value.audioExport))
         : null,
+      output: JSON.parse(JSON.stringify(currentConfig.value.output)),
     }
     if (existing) {
       const idx = userPresets.value.indexOf(existing)
@@ -64,10 +83,18 @@ export const usePresetsStore = defineStore('presets', () => {
     await persist()
   }
 
+  async function renamePreset(id: string, name: string) {
+    const preset = userPresets.value.find(p => p.id === id)
+    if (!preset) return
+    preset.name = name.trim()
+    await persist()
+  }
+
   async function persist() {
     try {
-      const store = await load('presets.json', { autoSave: false })
+      const store = await load('presets.json', { autoSave: false } as Parameters<typeof load>[1])
       await store.set('presets', userPresets.value)
+      await store.set('activePresetId', activePresetId.value)
       await store.save()
     } catch (e) {
       console.error('Failed to save presets:', e)
@@ -84,5 +111,6 @@ export const usePresetsStore = defineStore('presets', () => {
     applyPreset,
     saveCurrentAsPreset,
     deletePreset,
+    renamePreset,
   }
 })

@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import type { Job } from '@/types/jobs'
 
 defineProps<{ jobs: Job[] }>()
+defineEmits<{ clearHistory: [] }>()
 
 function basename(p: string) { return p.split(/[/\\]/).pop() ?? p }
 
@@ -23,7 +24,10 @@ function formatTime(ms: number) {
 
 <template>
   <div v-if="jobs.length" class="history">
-    <p class="section-title">History</p>
+    <div class="history-header-row">
+      <p class="section-title" style="margin:0">History</p>
+      <button class="btn btn-ghost clear-btn" @click="$emit('clearHistory')">Clear</button>
+    </div>
     <div v-for="job in jobs" :key="job.id" class="history-card" :class="`history-card--${job.status}`">
       <div class="history-header">
         <span class="history-name">{{ basename(job.inputPath) }}</span>
@@ -52,6 +56,10 @@ function formatTime(ms: number) {
 
 <style scoped>
 .history { margin-top: 20px; }
+.history-header-row {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+}
+.clear-btn { font-size: 12px; padding: 3px 10px; color: var(--muted); }
 .history-card {
   background: var(--surface);
   border: 1px solid var(--border);

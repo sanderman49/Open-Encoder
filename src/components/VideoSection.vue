@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { usePresetsStore } from '@/stores/presets'
 import { CODEC_CONTAINERS } from '@/types/preset'
-import type { VideoCodec, Container, Resolution, EncodePreset } from '@/types/preset'
+import type { VideoCodec, Container, Resolution, EncodePreset, HwAccel } from '@/types/preset'
 
 const store = usePresetsStore()
 const v = computed(() => store.currentConfig.video)
@@ -23,7 +23,7 @@ const CONTAINERS: { value: Container; label: string }[] = [
 ]
 
 const RESOLUTIONS: { value: Resolution; label: string }[] = [
-  { value: 'source', label: 'Source (unchanged)' },
+  { value: 'source', label: 'Original (unchanged)' },
   { value: '480p',   label: '480p' },
   { value: '720p',   label: '720p HD' },
   { value: '1080p',  label: '1080p Full HD' },
@@ -36,11 +36,21 @@ const PRESETS: EncodePreset[] = [
   'ultrafast','superfast','veryfast','faster','fast','medium','slow','slower','veryslow',
 ]
 
+const HW_ACCELS: { value: HwAccel; label: string }[] = [
+  { value: 'none',          label: 'None (software)' },
+  { value: 'nvenc',         label: 'NVENC (Nvidia)' },
+  { value: 'amf',           label: 'AMF (AMD)' },
+  { value: 'qsv',           label: 'Quick Sync (Intel)' },
+  { value: 'videotoolbox',  label: 'VideoToolbox (Apple/Metal)' },
+  { value: 'vaapi',         label: 'VAAPI (AMD/Intel Linux)' },
+]
+
 const validContainers = computed(() => CODEC_CONTAINERS[v.value.codec] ?? [])
 const showCrf = computed(() => v.value.codec !== 'copy')
 const showEncodePreset = computed(() => !['libvp9', 'libsvtav1', 'copy'].includes(v.value.codec))
 const showCustomRes = computed(() => v.value.resolution === 'custom')
 const showResolution = computed(() => v.value.codec !== 'copy')
+const showHwAccel = computed(() => ['libx264', 'libx265'].includes(v.value.codec))
 
 function onCodecChange(e: Event) {
   const codec = (e.target as HTMLSelectElement).value as VideoCodec
@@ -48,7 +58,10 @@ function onCodecChange(e: Event) {
   const valid = CODEC_CONTAINERS[codec]
   if (!valid.includes(v.value.container)) v.value.container = valid[0]
   if (codec === 'copy') { v.value.resolution = 'source'; v.value.encodePreset = null }
-  if (['libvp9', 'libsvtav1'].includes(codec)) v.value.encodePreset = null
+  if (['libvp9', 'libsvtav1', 'copy'].includes(codec)) {
+    v.value.encodePreset = null
+    v.value.hwAccel = 'none'
+  }
 }
 </script>
 
@@ -103,6 +116,19 @@ function onCodecChange(e: Event) {
         <option v-for="p in PRESETS" :key="p" :value="p">{{ p }}</option>
       </select>
     </div>
+
+    <div v-if="showHwAccel" class="form-row">
+      <label>Hardware encoder</label>
+      <select v-model="v.hwAccel">
+        <option v-for="h in HW_ACCELS" :key="h.value" :value="h.value">{{ h.label }}</option>
+      </select>
+    </div>
+
+    <div v-if="v.hwAccel === 'vaapi'" class="form-row">
+      <label>VAAPI device</label>
+      <input v-model="v.vaapiDevice" placeholder="/dev/dri/renderD128" />
+    </div>
+
   </div>
 </template>
 

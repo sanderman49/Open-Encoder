@@ -40,7 +40,7 @@ const ALGOS: { value: DeinterlaceAlgo; label: string; desc: string }[] = [
           </label>
         </div>
         <p v-if="di.autoDetect" class="hint">
-          Filter skipped if source is progressive
+          Filter skipped if original is progressive
         </p>
 
         <div class="form-row">
