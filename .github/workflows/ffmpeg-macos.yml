@@ -142,6 +142,8 @@ jobs:
             --enable-videotoolbox \
             --enable-audiotoolbox \
             --enable-coreimage \
+            --disable-x11grab \
+            --disable-xlib \
             --extra-cflags="-I$DEPS/include" \
             --extra-ldflags="-L$DEPS/lib" \
             --pkg-config-flags="--static" \
