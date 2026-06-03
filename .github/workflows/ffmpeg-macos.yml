@@ -41,12 +41,23 @@ jobs:
           cmake --build SVT-AV1/Build -j$(sysctl -n hw.logicalcpu)
           cmake --install SVT-AV1/Build
 
-      - name: Remove dylibs to force static linking
-        # Nuke ALL dylibs under the entire Homebrew prefix (including opt/ subdirs).
-        # Done after all git operations — Homebrew git itself needs libpcre2.dylib.
-        # Runner is ephemeral so this is safe.
+      - name: Remove codec dylibs to force static linking
+        # Target only the codec libraries — tools like git and pkg-config need their own dylibs.
+        # Search the entire prefix (including opt/) to catch versioned files outside /lib.
         run: |
-          find "$(brew --prefix)" -name "*.dylib" -delete || true
+          prefix=$(brew --prefix)
+          find "$prefix" \( \
+            -name "libx264*.dylib" \
+            -o -name "libx265*.dylib" \
+            -o -name "libvpx*.dylib" \
+            -o -name "libSvtAv1Enc*.dylib" \
+            -o -name "libmp3lame*.dylib" \
+            -o -name "libvorbis*.dylib" \
+            -o -name "libvorbisenc*.dylib" \
+            -o -name "libvorbisfile*.dylib" \
+            -o -name "libogg*.dylib" \
+            -o -name "libopus*.dylib" \
+          \) -delete || true
 
       - name: Configure
         working-directory: ffmpeg
