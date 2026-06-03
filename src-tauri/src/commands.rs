@@ -60,11 +60,8 @@ pub struct AudioExportConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutputConfig {
     pub video_dir: String,
-    pub audio_dir: String,
-    pub audio_dir_relative: bool,
-    pub create_date_folder: bool,
-    pub filename_prefix: String,
-    pub filename_suffix: String,
+    pub audio_dir: String,   // relative to video output dir; empty = same folder
+    pub name_override: String, // full filename stem; supports $DATE $TIME $DATETIME. empty = use req.title
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -206,27 +203,14 @@ fn resolve_output_dir(
     configured: &str,
     base_dir: &std::path::Path,
     is_relative: bool,
-    create_date_folder: bool,
 ) -> Result<std::path::PathBuf, String> {
-    let base = if configured.is_empty() {
+    let dir = if configured.is_empty() {
         base_dir.to_path_buf()
     } else if is_relative {
         base_dir.join(configured)
     } else {
         std::path::PathBuf::from(configured)
     };
-
-    let dir = if create_date_folder {
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        let (y, m, d) = secs_to_ymd(ts);
-        base.join(format!("{:04}-{:02}-{:02}", y, m, d))
-    } else {
-        base
-    };
-
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create output dir: {e}"))?;
     Ok(dir)
 }
@@ -251,32 +235,46 @@ async fn run_process(
     req: ProcessRequest,
     job_store: Arc<Mutex<HashMap<String, CommandChild>>>,
 ) -> Result<(), String> {
-    let file_stem = Path::new(&req.input_path)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("output")
-        .to_string();
-    // Title drives both the output filename and the embedded metadata title
-    let stem = if req.title.is_empty() { file_stem } else { req.title.clone() };
-
     let oc = &req.output_config;
-    let prefix = &oc.filename_prefix;
-    let suffix = &oc.filename_suffix;
+
+    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let secs_of_day = ts % 86400;
+    let (dy, dm, dd) = secs_to_ymd(ts);
+    let hh = secs_of_day / 3600;
+    let mm = (secs_of_day % 3600) / 60;
+    let ss = secs_of_day % 60;
+    let date_str     = format!("{:04}-{:02}-{:02}", dy, dm, dd);
+    let time_str     = format!("{:02}-{:02}-{:02}", hh, mm, ss);
+    let datetime_str = format!("{:04}-{:02}-{:02}_{:02}-{:02}-{:02}", dy, dm, dd, hh, mm, ss);
+
+    let expand = |s: &str| -> String {
+        s.replace("$DATETIME", &datetime_str)
+         .replace("$DATE", &date_str)
+         .replace("$TIME", &time_str)
+    };
+
+    // Determine output stem: name_override (with vars expanded) or user-edited title
+    let stem = if !oc.name_override.is_empty() {
+        expand(&oc.name_override)
+    } else if !req.title.is_empty() {
+        req.title.clone()
+    } else {
+        Path::new(&req.input_path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("output")
+            .to_string()
+    };
 
     let input_parent = Path::new(&req.input_path)
         .parent()
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
 
-    let video_dir = resolve_output_dir(&oc.video_dir, &input_parent, false, oc.create_date_folder)?;
+    let video_dir = resolve_output_dir(&oc.video_dir, &input_parent, false)?;
 
-    // Audio relative paths are resolved relative to the video output dir, not the source file
-    let audio_dir = if oc.audio_dir.is_empty() {
-        video_dir.clone()
-    } else {
-        let audio_base = if oc.audio_dir_relative { video_dir.as_path() } else { input_parent.as_path() };
-        resolve_output_dir(&oc.audio_dir, audio_base, oc.audio_dir_relative, false)?
-    };
+    // Audio dir is always relative to the video output dir
+    let audio_dir = resolve_output_dir(&oc.audio_dir, &video_dir, true)?;
 
     // ── Video pass ───────────────────────────────────────────────────────────
     let ext = if req.video.codec == "copy" {
@@ -290,7 +288,7 @@ async fn run_process(
     };
 
     let video_out = video_dir
-        .join(format!("{}{}{}.{}", prefix, stem, suffix, ext))
+        .join(format!("{}.{}", stem, ext))
         .to_string_lossy()
         .to_string();
     let video_args = build_video_args(&req, &video_out);
@@ -358,7 +356,7 @@ async fn run_process(
     // ── Audio export pass ────────────────────────────────────────────────────
     let audio_out = if let Some(ref cfg) = req.audio_export {
         let out = audio_dir
-            .join(format!("{}{}{}.{}", prefix, stem, suffix, cfg.format))
+            .join(format!("{}.{}", stem, cfg.format))
             .to_string_lossy()
             .to_string();
         let args = build_audio_args(&req.input_path, cfg, &out);

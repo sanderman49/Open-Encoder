@@ -36,12 +36,9 @@ export interface AudioExportConfig {
 }
 
 export interface OutputConfig {
-  videoDir: string           // absolute path; empty = input file's directory
-  audioDir: string           // path for audio output; empty = same as resolved video dir
-  audioDirRelative: boolean  // if true, audioDir is relative to input file's directory
-  createDateFolder: boolean  // create YYYY-MM-DD subfolder inside output dir
-  filenamePrefix: string     // prepend to output filename stem
-  filenameSuffix: string     // append to output filename stem (before extension)
+  videoDir: string     // absolute path; empty = input file's directory
+  audioDir: string     // relative to video output dir; empty = same folder
+  nameOverride: string // full filename stem override; supports $DATE. empty = use title input
 }
 
 export interface Preset {
@@ -87,10 +84,7 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
 export const DEFAULT_OUTPUT_CONFIG: OutputConfig = {
   videoDir: '',
   audioDir: '',
-  audioDirRelative: false,
-  createDateFolder: false,
-  filenamePrefix: '',
-  filenameSuffix: '',
+  nameOverride: '',
 }
 
 function makePreset(

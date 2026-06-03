@@ -80,10 +80,7 @@ function toRustConfig(cfg: typeof presetsStore.currentConfig) {
     outputConfig: {
       video_dir: videoDir,
       audio_dir: o.audioDir,
-      audio_dir_relative: o.audioDirRelative,
-      create_date_folder: o.createDateFolder,
-      filename_prefix: o.filenamePrefix,
-      filename_suffix: o.filenameSuffix,
+      name_override: o.nameOverride,
     },
   }
 }
@@ -121,13 +118,11 @@ const canStart = () =>
       <DropZone @file-selected="onFileSelected" />
 
       <div class="title-row">
-        <span class="title-fix" v-if="presetsStore.currentConfig.output.filenamePrefix">{{ presetsStore.currentConfig.output.filenamePrefix }}</span>
         <input
           v-model="videoTitle"
           class="title-input"
-          placeholder="Title / filename"
+          placeholder="Title"
         />
-        <span class="title-fix" v-if="presetsStore.currentConfig.output.filenameSuffix">{{ presetsStore.currentConfig.output.filenameSuffix }}</span>
       </div>
 
       <div class="output-row">
@@ -154,7 +149,8 @@ const canStart = () =>
       <div v-if="startError" class="start-error">{{ startError }}</div>
 
       <button
-        class="btn btn-primary start-btn"
+        class="btn start-btn"
+        :class="(jobsStore.activeJobs.length || starting) ? 'btn-processing' : 'btn-primary'"
         :disabled="!canStart()"
         @click="handleStart"
       >
@@ -190,35 +186,18 @@ const canStart = () =>
 }
 
 .title-row {
-  display: flex;
-  align-items: center;
-  gap: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
 }
-.title-fix {
-  padding: 10px 12px;
-  font-size: 13px;
-  color: var(--muted);
-  background: var(--elevated);
-  white-space: nowrap;
-  flex-shrink: 0;
-  border-right: 1px solid var(--border);
-}
-.title-fix:last-child {
-  border-right: none;
-  border-left: 1px solid var(--border);
-}
 .title-input {
-  flex: 1;
+  width: 100%;
   border: none;
   border-radius: 0;
   background: var(--surface);
   padding: 10px 12px;
   font-size: 13px;
-  min-width: 0;
 }
 .title-input:focus { border-color: transparent; outline: none; }
 
@@ -250,6 +229,12 @@ const canStart = () =>
   justify-content: center;
   padding: 12px;
   font-size: 15px;
+}
+.btn-processing {
+  background: var(--elevated);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  cursor: not-allowed;
 }
 
 

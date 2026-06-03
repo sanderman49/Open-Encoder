@@ -14,15 +14,18 @@ async function browseVideoDir() {
   if (dir) out.value.videoDir = dir
 }
 
-async function browseAudioDir() {
-  const dir = await pickOutputDir()
-  if (dir) out.value.audioDir = dir
-}
+const now = new Date()
+const pad = (n: number) => String(n).padStart(2, '0')
+const dateStr     = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+const timeStr     = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
+const datetimeStr = `${dateStr}_${timeStr}`
 
-const previewName = computed(() => {
-  const prefix = out.value.filenamePrefix || ''
-  const suffix = out.value.filenameSuffix || ''
-  return `${prefix}video${suffix}.mp4`
+const previewStem = computed(() => {
+  if (!out.value.nameOverride) return null
+  return out.value.nameOverride
+    .replace(/\$DATETIME/g, datetimeStr)
+    .replace(/\$DATE/g, dateStr)
+    .replace(/\$TIME/g, timeStr)
 })
 </script>
 
@@ -41,31 +44,18 @@ const previewName = computed(() => {
       </div>
     </div>
 
-    <!-- Date subfolder -->
+    <!-- Name override -->
     <div class="form-row">
-      <label>Date subfolder</label>
-      <label class="toggle">
-        <input v-model="out.createDateFolder" type="checkbox" />
-        <span class="toggle-track" />
-      </label>
+      <label>Name</label>
+      <input
+        v-model="out.nameOverride"
+        placeholder="Uses title from main screen"
+        class="path-input"
+      />
     </div>
-    <p v-if="out.createDateFolder" class="hint">
-      Files saved inside a <code>YYYY-MM-DD</code> folder e.g. <code>2026-06-02/</code>
-    </p>
-
-    <!-- Filename prefix / suffix -->
-    <div class="form-row">
-      <label>Prefix</label>
-      <input v-model="out.filenamePrefix" placeholder="e.g. export_" class="path-input" />
-    </div>
-
-    <div class="form-row">
-      <label>Suffix</label>
-      <input v-model="out.filenameSuffix" placeholder="e.g. _final" class="path-input" />
-    </div>
-
-    <p class="filename-preview">
-      Output name: <code>{{ previewName }}</code>
+    <p class="hint">Leave empty to use the editable title. Variables: <code>$DATE</code> <code>$TIME</code> <code>$DATETIME</code></p>
+    <p v-if="previewStem" class="filename-preview">
+      Output name: <code>{{ previewStem }}.mp4</code>
     </p>
 
     <!-- Audio sub-section -->
@@ -73,32 +63,14 @@ const previewName = computed(() => {
       <p class="audio-section-title">AUDIO OUTPUT</p>
 
       <div class="form-row">
-        <label>Folder</label>
-        <div class="path-row">
-          <input
-            v-model="out.audioDir"
-            :placeholder="out.audioDirRelative ? 'e.g. audio or ../exports' : 'Same as video'"
-            class="path-input"
-          />
-          <button
-            v-if="!out.audioDirRelative"
-            class="btn btn-ghost icon-btn"
-            @click="browseAudioDir"
-            title="Browse"
-          ><FolderOpen :size="14" /></button>
-        </div>
+        <label>Subfolder</label>
+        <input
+          v-model="out.audioDir"
+          placeholder="Same as video (e.g. audio)"
+          class="path-input"
+        />
       </div>
-
-      <div class="form-row">
-        <label>Relative to output folder</label>
-        <label class="toggle">
-          <input v-model="out.audioDirRelative" type="checkbox" />
-          <span class="toggle-track" />
-        </label>
-      </div>
-      <p v-if="out.audioDirRelative" class="hint">
-        Folder is relative to the video output folder. Created automatically if missing.
-      </p>
+      <p class="hint">Relative to video output folder. Created automatically if missing.</p>
     </template>
   </div>
 </template>
@@ -137,7 +109,7 @@ const previewName = computed(() => {
 .filename-preview {
   font-size: 12px;
   color: var(--muted);
-  margin-top: -4px;
+  margin-top: -8px;
   margin-bottom: 14px;
 }
 .filename-preview code {
