@@ -121,11 +121,12 @@ const canStart = () =>
       <DropZone @file-selected="onFileSelected" />
 
       <div class="title-row">
+        <span class="title-label">Title</span>
         <span class="title-fix" v-if="presetsStore.currentConfig.output.filenamePrefix">{{ presetsStore.currentConfig.output.filenamePrefix }}</span>
         <input
           v-model="videoTitle"
           class="title-input"
-          placeholder="Title / filename"
+          placeholder="Output filename / metadata title"
         />
         <span class="title-fix" v-if="presetsStore.currentConfig.output.filenameSuffix">{{ presetsStore.currentConfig.output.filenameSuffix }}</span>
       </div>
@@ -197,6 +198,15 @@ const canStart = () =>
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
+}
+.title-label {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--elevated);
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
 }
 .title-fix {
   padding: 10px 12px;
