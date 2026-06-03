@@ -10,8 +10,6 @@ jobs:
     runs-on: macos-14
     env:
       triple: aarch64-apple-darwin
-
-    env:
       DEPS: ${{ github.workspace }}/deps
 
     steps:
