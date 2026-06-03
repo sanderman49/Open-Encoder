@@ -39,10 +39,8 @@ const ALGOS: { value: DeinterlaceAlgo; label: string; desc: string }[] = [
             <span class="toggle-track" />
           </label>
         </div>
-        <p v-if="di.autoDetect" class="hint">
-          Filter skipped if original is progressive
-        </p>
 
+        <p v-if="di.autoDetect" class="hint">Filter skipped if source is progressive</p>
         <div class="form-row">
           <label>Algorithm</label>
           <select v-model="di.algorithm">
@@ -65,5 +63,5 @@ const ALGOS: { value: DeinterlaceAlgo; label: string; desc: string }[] = [
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
 }
-.hint { color: var(--muted); font-size: 12px; margin-top: -8px; margin-bottom: 14px; }
+.hint { color: var(--muted); font-size: 12px; margin-top: -8px; margin-bottom: 6px; }
 </style>

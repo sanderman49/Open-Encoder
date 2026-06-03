@@ -45,6 +45,7 @@ const previewStem = computed(() => {
     </div>
 
     <!-- Name override -->
+    <p class="hint">Leave empty to use the editable title. Variables: <code>$DATE</code> <code>$TIME</code> <code>$DATETIME</code></p>
     <div class="form-row">
       <label>Name</label>
       <input
@@ -53,15 +54,15 @@ const previewStem = computed(() => {
         class="path-input"
       />
     </div>
-    <p class="hint">Leave empty to use the editable title. Variables: <code>$DATE</code> <code>$TIME</code> <code>$DATETIME</code></p>
     <p v-if="previewStem" class="filename-preview">
-      Output name: <code>{{ previewStem }}.mp4</code>
+      → <code>{{ previewStem }}.mp4</code>
     </p>
 
     <!-- Audio sub-section -->
     <template v-if="hasAudioExport">
       <p class="audio-section-title">AUDIO OUTPUT</p>
 
+      <p class="hint">Relative to video output folder. Created automatically if missing.</p>
       <div class="form-row">
         <label>Subfolder</label>
         <input
@@ -70,7 +71,6 @@ const previewStem = computed(() => {
           class="path-input"
         />
       </div>
-      <p class="hint">Relative to video output folder. Created automatically if missing.</p>
     </template>
   </div>
 </template>
@@ -98,7 +98,7 @@ const previewStem = computed(() => {
   color: var(--muted);
   font-size: 12px;
   margin-top: -8px;
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 .hint code {
   color: var(--text);
@@ -109,8 +109,8 @@ const previewStem = computed(() => {
 .filename-preview {
   font-size: 12px;
   color: var(--muted);
-  margin-top: -8px;
-  margin-bottom: 14px;
+  margin-top: -12px;
+  margin-bottom: 18px;
 }
 .filename-preview code {
   color: var(--text);
