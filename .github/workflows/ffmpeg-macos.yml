@@ -1,4 +1,4 @@
-name: FFmpeg – macOS (Intel + Apple Silicon)
+name: FFmpeg – macOS (Apple Silicon)
 
 on:
   push:
@@ -7,16 +7,9 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-13
-            triple: x86_64-apple-darwin
-          - runner: macos-14
-            triple: aarch64-apple-darwin
-
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-14
+    env:
+      triple: aarch64-apple-darwin
 
     env:
       DEPS: ${{ github.workspace }}/deps
@@ -171,20 +164,20 @@ jobs:
       - name: Package and verify
         run: |
           mkdir -p binaries
-          cp "${{ github.workspace }}/ffmpeg_out/bin/ffmpeg"  binaries/ffmpeg-${{ matrix.triple }}
-          cp "${{ github.workspace }}/ffmpeg_out/bin/ffprobe" binaries/ffprobe-${{ matrix.triple }}
-          chmod +x binaries/ffmpeg-${{ matrix.triple }} binaries/ffprobe-${{ matrix.triple }}
+          cp "${{ github.workspace }}/ffmpeg_out/bin/ffmpeg"  binaries/ffmpeg-${{ env.triple }}
+          cp "${{ github.workspace }}/ffmpeg_out/bin/ffprobe" binaries/ffprobe-${{ env.triple }}
+          chmod +x binaries/ffmpeg-${{ env.triple }} binaries/ffprobe-${{ env.triple }}
 
           echo "=== Version ==="
-          binaries/ffmpeg-${{ matrix.triple }} -version
+          binaries/ffmpeg-${{ env.triple }} -version
 
           echo "=== Dynamic deps ==="
-          otool -L binaries/ffmpeg-${{ matrix.triple }}
-          otool -L binaries/ffprobe-${{ matrix.triple }}
+          otool -L binaries/ffmpeg-${{ env.triple }}
+          otool -L binaries/ffprobe-${{ env.triple }}
 
       - name: Check no Homebrew dylib leakage
         run: |
-          bad=$(otool -L binaries/ffmpeg-${{ matrix.triple }} binaries/ffprobe-${{ matrix.triple }} \
+          bad=$(otool -L binaries/ffmpeg-${{ env.triple }} binaries/ffprobe-${{ env.triple }} \
                 | grep -E '/opt/homebrew|/usr/local/lib' || true)
           if [ -n "$bad" ]; then
             echo "::error::Homebrew dylib dependencies found — static linking incomplete:"
@@ -196,7 +189,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ffmpeg-${{ matrix.triple }}
+          name: ffmpeg-${{ env.triple }}
           path: binaries/
           retention-days: 90
 
