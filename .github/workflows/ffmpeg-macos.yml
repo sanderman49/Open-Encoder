@@ -26,7 +26,7 @@ jobs:
         run: brew install nasm autoconf automake libtool
 
       - name: Set PKG_CONFIG_PATH
-        run: echo "PKG_CONFIG_PATH=$DEPS/lib/pkgconfig" >> $GITHUB_ENV
+        run: echo "PKG_CONFIG_PATH=$DEPS/lib/pkgconfig:$DEPS/lib64/pkgconfig" >> $GITHUB_ENV
 
       - name: Clone all sources
         run: |
@@ -83,7 +83,8 @@ jobs:
           cmake -S x265_git/source -B x265_build \
             -DCMAKE_BUILD_TYPE=Release \
             -DENABLE_SHARED=OFF \
-            -DCMAKE_INSTALL_PREFIX="$DEPS"
+            -DCMAKE_INSTALL_PREFIX="$DEPS" \
+            -DCMAKE_INSTALL_LIBDIR=lib
           cmake --build x265_build -j$(sysctl -n hw.logicalcpu)
           cmake --install x265_build
 
@@ -99,7 +100,8 @@ jobs:
           cmake -S SVT-AV1 -B SVT-AV1/Build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_INSTALL_PREFIX="$DEPS"
+            -DCMAKE_INSTALL_PREFIX="$DEPS" \
+            -DCMAKE_INSTALL_LIBDIR=lib
           cmake --build SVT-AV1/Build -j$(sysctl -n hw.logicalcpu)
           cmake --install SVT-AV1/Build
 
