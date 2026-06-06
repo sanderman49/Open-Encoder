@@ -1,0 +1,63 @@
+name: Build Linux (RPM)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download FFmpeg binaries
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p src-tauri/binaries
+          gh release download ffmpeg-bins \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "ffmpeg-x86_64-unknown-linux-gnu*" \
+            --pattern "ffprobe-x86_64-unknown-linux-gnu*" \
+            --dir src-tauri/binaries/
+          chmod +x src-tauri/binaries/*
+          test -f src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu || { echo "ERROR: ffmpeg binary missing from ffmpeg-bins release"; exit 1; }
+          test -f src-tauri/binaries/ffprobe-x86_64-unknown-linux-gnu || { echo "ERROR: ffprobe binary missing from ffmpeg-bins release"; exit 1; }
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            rpm
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust build cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run tauri:build -- --bundles rpm
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-linux-rpm
+          retention-days: 30
+          path: src-tauri/target/release/bundle/**/*.rpm

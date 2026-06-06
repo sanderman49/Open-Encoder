@@ -1,0 +1,67 @@
+name: Build macOS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download FFmpeg binaries
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p src-tauri/binaries
+          gh release download ffmpeg-bins \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "ffmpeg-aarch64-apple-darwin*" \
+            --pattern "ffprobe-aarch64-apple-darwin*" \
+            --dir src-tauri/binaries/
+          chmod +x src-tauri/binaries/*
+          test -f src-tauri/binaries/ffmpeg-aarch64-apple-darwin || { echo "ERROR: ffmpeg binary missing from ffmpeg-bins release"; exit 1; }
+          test -f src-tauri/binaries/ffprobe-aarch64-apple-darwin || { echo "ERROR: ffprobe binary missing from ffmpeg-bins release"; exit 1; }
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust build cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build app bundle
+        run: npm run tauri:build -- --bundles app
+
+      - name: Ad-hoc sign app bundle
+        run: |
+          APP=$(find src-tauri/target/release/bundle/macos -name "*.app" | head -1)
+          codesign --deep --force --sign - "$APP"
+
+      - name: Package DMG
+        run: |
+          APP=$(find src-tauri/target/release/bundle/macos -name "*.app" | head -1)
+          APPNAME=$(basename "$APP" .app)
+          mkdir -p src-tauri/target/release/bundle/dmg
+          hdiutil create \
+            -volname "$APPNAME" \
+            -srcfolder "$APP" \
+            -ov -format UDZO \
+            "src-tauri/target/release/bundle/dmg/${APPNAME}_aarch64.dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-macos
+          retention-days: 30
+          path: src-tauri/target/release/bundle/dmg/*.dmg
