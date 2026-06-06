@@ -47,6 +47,8 @@ jobs:
             --pattern "ffprobe-${{ matrix.triple }}*" \
             --dir src-tauri/binaries/
           chmod +x src-tauri/binaries/* 2>/dev/null || true
+          test -f src-tauri/binaries/ffmpeg-${{ matrix.triple }} || { echo "ERROR: ffmpeg-${{ matrix.triple }} not in ffmpeg-bins release"; exit 1; }
+          test -f src-tauri/binaries/ffprobe-${{ matrix.triple }} || { echo "ERROR: ffprobe-${{ matrix.triple }} not in ffmpeg-bins release"; exit 1; }
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
