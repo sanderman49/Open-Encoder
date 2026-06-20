@@ -108,7 +108,7 @@ struct ErrorEvent {
 pub async fn probe_video(app: AppHandle, input_path: String) -> Result<VideoProbeResult, String> {
     let (mut rx, _child) = app
         .shell()
-        .sidecar("binaries/ffprobe")
+        .sidecar("ffprobe")
         .map_err(|e| e.to_string())?
         .args([
             "-v",
@@ -300,7 +300,7 @@ async fn run_process(
 
     let (mut rx, child) = app
         .shell()
-        .sidecar("binaries/ffmpeg")
+        .sidecar("ffmpeg")
         .map_err(|e| e.to_string())?
         .args(&video_args)
         .spawn()
@@ -324,7 +324,7 @@ async fn run_process(
 
         let (mut rx2, child2) = app
             .shell()
-            .sidecar("binaries/ffmpeg")
+            .sidecar("ffmpeg")
             .map_err(|e| e.to_string())?
             .args(&args)
             .spawn()

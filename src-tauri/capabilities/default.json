@@ -6,8 +6,8 @@
     {
       "identifier": "shell:allow-execute",
       "allow": [
-        { "name": "binaries/ffmpeg", "sidecar": true, "args": true },
-        { "name": "binaries/ffprobe", "sidecar": true, "args": true }
+        { "name": "ffmpeg", "sidecar": true, "args": true },
+        { "name": "ffprobe", "sidecar": true, "args": true }
       ]
     },
     "shell:allow-spawn",

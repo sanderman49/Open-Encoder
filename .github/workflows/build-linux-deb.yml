@@ -13,15 +13,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p src-tauri/binaries
           gh release download ffmpeg-bins \
             --repo "$GITHUB_REPOSITORY" \
             --pattern "ffmpeg-x86_64-unknown-linux-gnu*" \
             --pattern "ffprobe-x86_64-unknown-linux-gnu*" \
-            --dir src-tauri/binaries/
-          chmod +x src-tauri/binaries/*
-          test -f src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu || { echo "ERROR: ffmpeg binary missing from ffmpeg-bins release"; exit 1; }
-          test -f src-tauri/binaries/ffprobe-x86_64-unknown-linux-gnu || { echo "ERROR: ffprobe binary missing from ffmpeg-bins release"; exit 1; }
+            --dir src-tauri/
+          chmod +x src-tauri/ffmpeg-* src-tauri/ffprobe-*
+          test -f src-tauri/ffmpeg-x86_64-unknown-linux-gnu || { echo "ERROR: ffmpeg binary missing from ffmpeg-bins release"; exit 1; }
+          test -f src-tauri/ffprobe-x86_64-unknown-linux-gnu || { echo "ERROR: ffprobe binary missing from ffmpeg-bins release"; exit 1; }
 
       - name: Install system dependencies
         run: |

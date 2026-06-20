@@ -14,14 +14,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          mkdir -p src-tauri/binaries
           gh release download ffmpeg-bins \
             --repo "$GITHUB_REPOSITORY" \
             --pattern "ffmpeg-x86_64-pc-windows-msvc*" \
             --pattern "ffprobe-x86_64-pc-windows-msvc*" \
-            --dir src-tauri/binaries/
-          test -f src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe || { echo "ERROR: ffmpeg binary missing from ffmpeg-bins release"; exit 1; }
-          test -f src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe || { echo "ERROR: ffprobe binary missing from ffmpeg-bins release"; exit 1; }
+            --dir src-tauri/
+          test -f src-tauri/ffmpeg-x86_64-pc-windows-msvc.exe || { echo "ERROR: ffmpeg binary missing from ffmpeg-bins release"; exit 1; }
+          test -f src-tauri/ffprobe-x86_64-pc-windows-msvc.exe || { echo "ERROR: ffprobe binary missing from ffmpeg-bins release"; exit 1; }
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
