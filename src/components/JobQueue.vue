@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+import { useJobsStore } from '@/stores/jobs'
 import type { Job } from '@/types/jobs'
 
 defineProps<{ jobs: Job[] }>()
 defineEmits<{ cancel: [id: string] }>()
+
+const jobsStore = useJobsStore()
+const expanded = ref<Record<string, boolean>>({})
 
 function eta(s: number) {
   if (s <= 0) return ''
@@ -44,7 +49,12 @@ function basename(p: string) { return p.split(/[/\\]/).pop() ?? p }
       <div class="job-meta">
         <span v-if="job.speed !== 'N/A'" class="speed">{{ job.speed }}</span>
         <span v-if="job.etaSeconds > 0" class="eta">{{ eta(job.etaSeconds) }}</span>
+        <button class="log-toggle" @click="expanded[job.id] = !expanded[job.id]">
+          {{ expanded[job.id] ? 'Hide log' : 'Show log' }}
+        </button>
       </div>
+
+      <pre v-if="expanded[job.id]" class="ffmpeg-log">{{ (jobsStore.logs[job.id] ?? []).join('\n') }}</pre>
     </div>
   </div>
 </template>
@@ -117,4 +127,29 @@ function basename(p: string) { return p.split(/[/\\]/).pop() ?? p }
   margin-top: 6px;
 }
 .speed, .eta { font-size: 11px; color: var(--muted); }
+.log-toggle {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.log-toggle:hover { color: var(--text); }
+
+.ffmpeg-log {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--elevated);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 </style>

@@ -1,9 +1,14 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useJobsStore } from '@/stores/jobs'
 import type { Job } from '@/types/jobs'
 
 defineProps<{ jobs: Job[] }>()
 defineEmits<{ clearHistory: [] }>()
+
+const jobsStore = useJobsStore()
+const expanded = ref<Record<string, boolean>>({})
 
 function basename(p: string) { return p.split(/[/\\]/).pop() ?? p }
 
@@ -49,7 +54,14 @@ function formatTime(ms: number) {
 
       <div v-if="job.status === 'failed'" class="error-msg">{{ job.error }}</div>
 
-      <div class="history-time">{{ formatTime(job.completedAt ?? job.createdAt) }}</div>
+      <div class="history-footer">
+        <span class="history-time">{{ formatTime(job.completedAt ?? job.createdAt) }}</span>
+        <button v-if="jobsStore.logs[job.id]?.length" class="log-toggle" @click="expanded[job.id] = !expanded[job.id]">
+          {{ expanded[job.id] ? 'Hide log' : 'Show log' }}
+        </button>
+      </div>
+
+      <pre v-if="expanded[job.id]" class="ffmpeg-log">{{ (jobsStore.logs[job.id] ?? []).join('\n') }}</pre>
     </div>
   </div>
 </template>
@@ -127,5 +139,35 @@ function formatTime(ms: number) {
   margin-bottom: 4px;
 }
 
-.history-time { font-size: 11px; color: var(--muted); margin-top: 6px; }
+.history-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.history-time { font-size: 11px; color: var(--muted); }
+.log-toggle {
+  font-size: 11px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.log-toggle:hover { color: var(--text); }
+
+.ffmpeg-log {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--elevated);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 </style>

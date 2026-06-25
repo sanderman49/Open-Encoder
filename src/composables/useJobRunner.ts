@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useJobsStore } from '@/stores/jobs'
 import type { VideoProbeResult } from '@/types/preset'
-import type { JobProgressPayload, JobCompletePayload, JobErrorPayload } from '@/types/jobs'
+import type { JobProgressPayload, JobCompletePayload, JobErrorPayload, JobLogPayload } from '@/types/jobs'
 
 export interface StartProcessArgs {
   inputPath: string
@@ -24,6 +24,7 @@ export function useJobRunner() {
       await listen<JobProgressPayload>('job-progress', e => jobsStore.updateProgress(e.payload)),
       await listen<JobCompletePayload>('job-complete', e => jobsStore.complete(e.payload)),
       await listen<JobErrorPayload>('job-error', e => jobsStore.fail(e.payload)),
+      await listen<JobLogPayload>('job-log', e => jobsStore.appendLog(e.payload)),
     )
   })
 

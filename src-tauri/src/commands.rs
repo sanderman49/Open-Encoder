@@ -41,12 +41,16 @@ pub struct VideoConfig {
     pub resolution: String,
     pub custom_width: Option<u32>,
     pub custom_height: Option<u32>,
+    #[serde(default = "default_framerate")]
+    pub framerate: String,
     pub crf: u8,
     pub encode_preset: Option<String>,
     pub deinterlace: DeinterlaceConfig,
     pub hw_accel: String,
     pub vaapi_device: String,
 }
+
+fn default_framerate() -> String { "source".to_string() }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioExportConfig {
@@ -100,6 +104,12 @@ struct CompleteEvent {
 struct ErrorEvent {
     job_id: String,
     error: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct LogEvent {
+    job_id: String,
+    line: String,
 }
 
 // ─── probe_video ──────────────────────────────────────────────────────────────
@@ -292,10 +302,14 @@ async fn run_process(
         req.video.container.clone()
     };
 
-    let video_out = video_dir
-        .join(format!("{}.{}", stem, ext))
-        .to_string_lossy()
-        .to_string();
+    let video_out = {
+        let candidate = video_dir.join(format!("{}.{}", stem, ext));
+        if candidate == Path::new(&req.input_path) {
+            video_dir.join(format!("{}_1.{}", stem, ext))
+        } else {
+            candidate
+        }
+    }.to_string_lossy().to_string();
     let video_args = build_video_args(&req, &video_out);
 
     let (mut rx, child) = app
@@ -366,6 +380,7 @@ async fn run_ffmpeg_loop(
     let mut stdout_buf = String::new();
     let mut block: HashMap<String, String> = HashMap::new();
     let mut stderr_buf = String::new();
+    let mut stderr_line_buf = String::new();
 
     loop {
         match rx.recv().await {
@@ -385,9 +400,32 @@ async fn run_ffmpeg_loop(
                 }
             }
             Some(CommandEvent::Stderr(b)) => {
-                stderr_buf.push_str(&String::from_utf8_lossy(&b));
+                let chunk = String::from_utf8_lossy(&b);
+                let combined = format!("{}{}", stderr_line_buf, chunk);
+                let mut parts = combined.split('\n').collect::<Vec<_>>();
+                stderr_line_buf = parts.pop().unwrap_or("").to_string();
+                for raw in parts {
+                    let line = raw.trim_end_matches('\r');
+                    if line.is_empty() { continue; }
+                    stderr_buf.push_str(line);
+                    stderr_buf.push('\n');
+                    let _ = app.emit("job-log", LogEvent {
+                        job_id: event_job_id.to_string(),
+                        line: line.to_string(),
+                    });
+                }
             }
             Some(CommandEvent::Terminated(p)) => {
+                // Flush any remaining partial stderr line
+                let remainder = stderr_line_buf.trim_end_matches('\r').to_string();
+                if !remainder.is_empty() {
+                    stderr_buf.push_str(&remainder);
+                    stderr_buf.push('\n');
+                    let _ = app.emit("job-log", LogEvent {
+                        job_id: event_job_id.to_string(),
+                        line: remainder,
+                    });
+                }
                 let was_cancelled = job_store.lock().unwrap().remove(store_key).is_none();
                 if was_cancelled { return Err("__cancelled__".into()); }
                 if p.code != Some(0) {
@@ -618,6 +656,20 @@ fn build_video_args(req: &ProcessRequest, output: &str) -> Vec<String> {
     // Title metadata
     if !req.title.is_empty() {
         args.extend(["-metadata".into(), format!("title={}", req.title)]);
+    }
+
+    // Framerate
+    if !is_copy {
+        let fps_ffmpeg = match req.video.framerate.as_str() {
+            "23.976" => Some("24000/1001"),
+            "29.97"  => Some("30000/1001"),
+            "59.94"  => Some("60000/1001"),
+            "source" => None,
+            other    => Some(other),
+        };
+        if let Some(fps) = fps_ffmpeg {
+            args.extend(["-r".into(), fps.into()]);
+        }
     }
 
     // Audio passthrough + progress

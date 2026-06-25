@@ -3,7 +3,7 @@ import { computed, ref, onMounted } from 'vue'
 import { platform } from '@tauri-apps/plugin-os'
 import { usePresetsStore } from '@/stores/presets'
 import { CODEC_CONTAINERS } from '@/types/preset'
-import type { VideoCodec, Container, Resolution, EncodePreset, HwAccel } from '@/types/preset'
+import type { VideoCodec, Container, Resolution, EncodePreset, HwAccel, Framerate } from '@/types/preset'
 
 const store = usePresetsStore()
 const v = computed(() => store.currentConfig.video)
@@ -37,7 +37,20 @@ const PRESETS: EncodePreset[] = [
   'ultrafast','superfast','veryfast','faster','fast','medium','slow','slower','veryslow',
 ]
 
+const FRAMERATES: { value: Framerate; label: string }[] = [
+  { value: 'source',  label: 'Original (unchanged)' },
+  { value: '23.976', label: '23.976 fps (film NTSC)' },
+  { value: '24',     label: '24 fps (cinema)' },
+  { value: '25',     label: '25 fps (PAL)' },
+  { value: '29.97',  label: '29.97 fps (NTSC)' },
+  { value: '30',     label: '30 fps' },
+  { value: '50',     label: '50 fps (PAL HFR)' },
+  { value: '59.94',  label: '59.94 fps (NTSC HFR)' },
+  { value: '60',     label: '60 fps' },
+]
+
 const ALL_HW_ACCELS: { value: HwAccel; label: string; os: string[] }[] = [
+  { value: 'none',         label: 'Software (CPU)',           os: ['windows', 'linux', 'macos'] },
   { value: 'nvenc',        label: 'NVENC (Nvidia)',           os: ['windows', 'linux'] },
   { value: 'amf',          label: 'AMF (AMD)',                os: ['windows'] },
   { value: 'qsv',          label: 'Quick Sync (Intel)',       os: ['windows', 'linux'] },
@@ -60,6 +73,7 @@ const showCrf = computed(() => v.value.codec !== 'copy')
 const showEncodePreset = computed(() => !['libvp9', 'libsvtav1', 'copy'].includes(v.value.codec))
 const showCustomRes = computed(() => v.value.resolution === 'custom')
 const showResolution = computed(() => v.value.codec !== 'copy')
+const showFramerate = computed(() => v.value.codec !== 'copy')
 const showHwAccel = computed(() => ['libx264', 'libx265'].includes(v.value.codec))
 
 function onCodecChange(e: Event) {
@@ -109,6 +123,13 @@ function onCodecChange(e: Event) {
       <input v-model.number="v.customWidth" type="number" placeholder="Width" min="1" />
       <span class="sep">×</span>
       <input v-model.number="v.customHeight" type="number" placeholder="Height" min="1" />
+    </div>
+
+    <div v-if="showFramerate" class="form-row">
+      <label>Frame rate</label>
+      <select v-model="v.framerate">
+        <option v-for="f in FRAMERATES" :key="f.value" :value="f.value">{{ f.label }}</option>
+      </select>
     </div>
 
     <div v-if="showCrf" class="form-row crf-row">

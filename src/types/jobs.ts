@@ -35,3 +35,8 @@ export interface JobErrorPayload {
   job_id: string
   error: string
 }
+
+export interface JobLogPayload {
+  job_id: string
+  line: string
+}

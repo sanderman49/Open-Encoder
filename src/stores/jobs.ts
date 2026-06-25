@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Job, JobProgressPayload, JobCompletePayload, JobErrorPayload } from '@/types/jobs'
+import type { Job, JobProgressPayload, JobCompletePayload, JobErrorPayload, JobLogPayload } from '@/types/jobs'
 
 export const useJobsStore = defineStore('jobs', () => {
   const jobs = ref<Job[]>([])
+  const logs = ref<Record<string, string[]>>({})
 
   const activeJobs = computed(() =>
     jobs.value.filter(j => j.status === 'queued' || j.status === 'running'),
@@ -68,9 +69,18 @@ export const useJobsStore = defineStore('jobs', () => {
     job.completedAt = Date.now()
   }
 
+  function appendLog(payload: JobLogPayload) {
+    if (!logs.value[payload.job_id]) logs.value[payload.job_id] = []
+    logs.value[payload.job_id].push(payload.line)
+  }
+
   function clearHistory() {
+    const cleared = jobs.value
+      .filter(j => j.status !== 'queued' && j.status !== 'running')
+      .map(j => j.id)
+    cleared.forEach(id => delete logs.value[id])
     jobs.value = jobs.value.filter(j => j.status === 'queued' || j.status === 'running')
   }
 
-  return { jobs, activeJobs, completedJobs, addJob, updateProgress, complete, fail, cancel, clearHistory }
+  return { jobs, activeJobs, completedJobs, logs, addJob, updateProgress, complete, fail, cancel, appendLog, clearHistory }
 })

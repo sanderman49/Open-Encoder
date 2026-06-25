@@ -2,6 +2,7 @@ export type VideoCodec = 'libx264' | 'libx265' | 'libvp9' | 'libsvtav1' | 'copy'
 export type HwAccel = 'none' | 'nvenc' | 'amf' | 'qsv' | 'videotoolbox' | 'vaapi'
 export type Container = 'mp4' | 'mkv' | 'webm' | 'mov'
 export type Resolution = '480p' | '720p' | '1080p' | '1440p' | '2160p' | 'source' | 'custom'
+export type Framerate = 'source' | '23.976' | '24' | '25' | '29.97' | '30' | '50' | '59.94' | '60'
 export type DeinterlaceAlgo = 'yadif' | 'bwdif' | 'estdif'
 export type AudioFormat = 'mp3' | 'wav' | 'flac' | 'm4a' | 'ogg' | 'opus' | 'aiff'
 export type SampleRate = 22050 | 44100 | 48000 | 96000 | 192000
@@ -20,6 +21,7 @@ export interface VideoConfig {
   resolution: Resolution
   customWidth?: number
   customHeight?: number
+  framerate: Framerate
   crf: number
   encodePreset: EncodePreset | null
   deinterlace: DeinterlaceConfig
@@ -74,6 +76,7 @@ export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
   codec: 'libx264',
   container: 'mp4',
   resolution: 'source',
+  framerate: 'source',
   crf: 23,
   encodePreset: 'medium',
   deinterlace: { enabled: false, autoDetect: true, algorithm: 'bwdif' },
@@ -99,6 +102,7 @@ function makePreset(
       codec: 'libx264',
       container: 'mp4',
       resolution,
+      framerate: 'source',
       crf: 18,
       encodePreset: 'slow',
       deinterlace: { enabled: true, autoDetect: true, algorithm: 'bwdif' },
