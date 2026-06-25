@@ -55,6 +55,8 @@ select {
 }
 select:focus, input:focus { border-color: var(--accent); }
 
+input::placeholder { color: var(--muted); opacity: 0.45; }
+
 input[type="range"] {
   background: none;
   border: none;
@@ -92,12 +94,11 @@ label { color: var(--muted); font-size: 12px; user-select: none; }
 .btn-danger:hover { background: #dc2626; }
 
 .section-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #b8b8b8;
+  margin-bottom: 14px;
 }
 
 .divider {
@@ -106,36 +107,19 @@ label { color: var(--muted); font-size: 12px; user-select: none; }
   margin: 20px 0;
 }
 
-/* Toggle switch */
-.toggle {
-  position: relative;
-  display: inline-block;
-  width: 36px;
-  height: 20px;
-  flex-shrink: 0;
-}
-.toggle input { display: none; }
-.toggle-track {
-  position: absolute;
-  inset: 0;
-  background: var(--border);
-  border-radius: 20px;
+/* Toggle switch label + greyable subfolder input (switch lives in ToggleSwitch.vue) */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
-  transition: background 0.2s;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--muted);
 }
-.toggle input:checked + .toggle-track { background: var(--accent); }
-.toggle-track::after {
-  content: '';
-  position: absolute;
-  left: 2px;
-  top: 2px;
-  width: 16px;
-  height: 16px;
-  background: #fff;
-  border-radius: 50%;
-  transition: transform 0.2s;
-}
-.toggle input:checked + .toggle-track::after { transform: translateX(16px); }
+
+.subdir-input { max-width: 120px; flex: unset; }
+.subdir-input.disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* Form row */
 .form-row {

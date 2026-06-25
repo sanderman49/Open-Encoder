@@ -1,12 +1,28 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { platform } from '@tauri-apps/plugin-os'
+import { invoke } from '@tauri-apps/api/core'
 import { usePresetsStore } from '@/stores/presets'
-import { CODEC_CONTAINERS } from '@/types/preset'
-import type { VideoCodec, Container, Resolution, EncodePreset, HwAccel, Framerate } from '@/types/preset'
+import { CODEC_CONTAINERS, DEFAULT_AUDIO_EXPORT_CONFIG } from '@/types/preset'
+import type { VideoCodec, Container, Resolution, EncodePreset, HwAccel, Framerate, DeinterlaceAlgo } from '@/types/preset'
+import { useTemplateVars } from '@/composables/useTemplateVars'
+import VarInfoButton from './VarInfoButton.vue'
+import ToggleSwitch from './ToggleSwitch.vue'
+import InfoTip from './InfoTip.vue'
 
 const store = usePresetsStore()
 const v = computed(() => store.currentConfig.video)
+const out = computed(() => store.currentConfig.output)
+const { expand } = useTemplateVars()
+
+// Export video toggle. At least one of video/audio must stay enabled, so disabling
+// video forces audio export on when it would otherwise leave nothing to produce.
+function setVideoEnabled(on: boolean) {
+  v.value.videoEnabled = on
+  if (!on && !store.currentConfig.audioExport) {
+    store.currentConfig.audioExport = { ...DEFAULT_AUDIO_EXPORT_CONFIG }
+  }
+}
 
 const CODECS: { value: VideoCodec; label: string }[] = [
   { value: 'libx264', label: 'H.264 (libx264)' },
@@ -60,11 +76,18 @@ const ALL_HW_ACCELS: { value: HwAccel; label: string; os: string[] }[] = [
 
 const currentOs = ref('linux')
 const HW_ACCELS = computed(() => ALL_HW_ACCELS.filter(h => h.os.includes(currentOs.value)))
+const vaapiDevices = ref<string[]>([])
 
 onMounted(async () => {
   currentOs.value = await platform()
   if (v.value.hwAccel !== 'none' && !HW_ACCELS.value.find(h => h.value === v.value.hwAccel)) {
     v.value.hwAccel = 'none'
+  }
+  if (currentOs.value === 'linux') {
+    vaapiDevices.value = await invoke<string[]>('list_vaapi_devices')
+    if (vaapiDevices.value.length && !vaapiDevices.value.includes(v.value.vaapiDevice)) {
+      v.value.vaapiDevice = vaapiDevices.value[0]
+    }
   }
 })
 
@@ -85,14 +108,49 @@ function onCodecChange(e: Event) {
   if (['libvp9', 'libsvtav1', 'copy'].includes(codec)) {
     v.value.encodePreset = null
     v.value.hwAccel = 'none'
+  } else if (v.value.encodePreset === null) {
+    v.value.encodePreset = 'fast'
   }
 }
+
+// ── Filters: deinterlace (lives on video.deinterlace) ──
+const di = computed(() => v.value.deinterlace)
+const isCopy = computed(() => v.value.codec === 'copy')
+const ALGOS: { value: DeinterlaceAlgo; label: string; desc: string }[] = [
+  { value: 'bwdif', label: 'bwdif', desc: 'Best quality, motion-adaptive' },
+  { value: 'yadif', label: 'yadif', desc: 'Fast, widely compatible' },
+  { value: 'estdif', label: 'estdif', desc: 'Edge-slope tracing' },
+]
+
+// ── Output: video title + subfolder ──
+const videoTitlePreview = computed(() =>
+  out.value.nameOverride ? expand(out.value.nameOverride) : null,
+)
+
+const lastVideoSubdir = ref(out.value.videoSubdir || 'video')
+const videoSubdirEnabled = ref(out.value.videoSubdir !== '')
+watch(videoSubdirEnabled, (on) => {
+  if (on) {
+    out.value.videoSubdir = lastVideoSubdir.value
+  } else {
+    lastVideoSubdir.value = out.value.videoSubdir || lastVideoSubdir.value
+    out.value.videoSubdir = ''
+  }
+})
 </script>
 
 <template>
   <div>
     <p class="section-title">Video</p>
 
+    <div class="form-row">
+      <span class="toggle-label">
+        <ToggleSwitch :model-value="v.videoEnabled" @update:model-value="setVideoEnabled" />
+        Export video file
+      </span>
+    </div>
+
+    <div class="section-body" :class="{ disabled: !v.videoEnabled }">
     <div class="form-row">
       <label>Codec</label>
       <select :value="v.codec" @change="onCodecChange">
@@ -157,7 +215,70 @@ function onCodecChange(e: Event) {
 
     <div v-if="v.hwAccel === 'vaapi'" class="form-row">
       <label>VAAPI device</label>
-      <input v-model="v.vaapiDevice" placeholder="/dev/dri/renderD128" />
+      <select v-model="v.vaapiDevice">
+        <option v-for="d in vaapiDevices" :key="d" :value="d">{{ d }}</option>
+      </select>
+    </div>
+
+    <!-- ── Filters ── -->
+    <p class="sub-title">Filters</p>
+
+    <div v-if="isCopy" class="notice">
+      Deinterlace requires re-encoding. Select a codec above.
+    </div>
+
+    <template v-else>
+      <div class="toggle-pair">
+        <span class="toggle-label">
+          <ToggleSwitch v-model="di.enabled" /> Deinterlace
+        </span>
+        <span class="toggle-label fade" :class="{ disabled: !di.enabled }">
+          <ToggleSwitch v-model="di.autoDetect" /> Auto-detect
+          <InfoTip>Filter skipped if the source is already progressive</InfoTip>
+        </span>
+      </div>
+
+      <div class="section-body" :class="{ disabled: !di.enabled }">
+        <div class="form-row">
+          <label>Algorithm</label>
+          <select v-model="di.algorithm">
+            <option v-for="a in ALGOS" :key="a.value" :value="a.value">
+              {{ a.label }} — {{ a.desc }}
+            </option>
+          </select>
+        </div>
+      </div>
+    </template>
+
+    <!-- ── Output ── -->
+    <template v-if="!isCopy">
+      <p class="sub-title">Output</p>
+
+      <div class="form-row">
+        <label>Video title</label>
+        <div class="field-with-info">
+          <input v-model="out.nameOverride" placeholder="Defaults to manual title" class="var-field" />
+          <VarInfoButton />
+        </div>
+      </div>
+      <p v-if="videoTitlePreview" class="filename-preview">→ <code>{{ videoTitlePreview }}.{{ v.container }}</code></p>
+
+      <div class="form-row">
+        <span class="toggle-label">
+          <ToggleSwitch v-model="videoSubdirEnabled" /> Video subfolder
+        </span>
+        <div class="field-with-info">
+          <input
+            v-model="out.videoSubdir"
+            placeholder="video"
+            class="var-field subdir-input"
+            :disabled="!videoSubdirEnabled"
+            :class="{ disabled: !videoSubdirEnabled }"
+          />
+          <VarInfoButton />
+        </div>
+      </div>
+    </template>
     </div>
 
   </div>
@@ -184,4 +305,58 @@ function onCodecChange(e: Event) {
 }
 .range-wrap input { flex: 1; }
 .range-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+.sub-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 22px 0 12px;
+}
+
+.field-with-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.toggle-pair {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-bottom: 18px;
+}
+
+.section-body,
+.toggle-label.fade {
+  transition: opacity 0.1s ease;
+}
+.section-body.disabled,
+.toggle-label.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.notice {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 8px 12px;
+  background: var(--elevated);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.hint { color: var(--muted); font-size: 12px; margin-top: -8px; margin-bottom: 6px; }
+
+.filename-preview {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: -12px;
+  margin-bottom: 18px;
+}
+.filename-preview code { color: var(--text); font-family: monospace; font-size: 11px; word-break: break-all; }
 </style>

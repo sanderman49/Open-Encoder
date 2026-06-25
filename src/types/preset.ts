@@ -16,6 +16,7 @@ export interface DeinterlaceConfig {
 }
 
 export interface VideoConfig {
+  videoEnabled: boolean
   codec: VideoCodec
   container: Container
   resolution: Resolution
@@ -38,9 +39,11 @@ export interface AudioExportConfig {
 }
 
 export interface OutputConfig {
-  videoDir: string     // absolute path; empty = input file's directory
-  audioDir: string     // relative to video output dir; empty = same folder
-  nameOverride: string // full filename stem override; supports $DATE. empty = use title input
+  videoDir: string          // base output dir (absolute); supports variables; empty = input dir
+  videoSubdir: string       // subfolder within videoDir for video; empty = directly in videoDir
+  audioDir: string          // subfolder within videoDir for audio; empty = same as videoDir
+  nameOverride: string      // video filename stem override; supports variables; empty = use title
+  audioNameOverride: string // audio filename stem override; supports variables; empty = inherit video stem
 }
 
 export interface Preset {
@@ -73,21 +76,31 @@ export const CODEC_CONTAINERS: Record<VideoCodec, Container[]> = {
 }
 
 export const DEFAULT_VIDEO_CONFIG: VideoConfig = {
+  videoEnabled: true,
   codec: 'libx264',
   container: 'mp4',
   resolution: 'source',
   framerate: 'source',
   crf: 23,
-  encodePreset: 'medium',
+  encodePreset: 'fast',
   deinterlace: { enabled: false, autoDetect: true, algorithm: 'bwdif' },
   hwAccel: 'none',
   vaapiDevice: '/dev/dri/renderD128',
 }
 
+export const DEFAULT_AUDIO_EXPORT_CONFIG: AudioExportConfig = {
+  format: 'mp3',
+  bitrate: '320k',
+  sampleRate: 48000,
+  channels: 2,
+}
+
 export const DEFAULT_OUTPUT_CONFIG: OutputConfig = {
   videoDir: '',
+  videoSubdir: '',
   audioDir: '',
   nameOverride: '',
+  audioNameOverride: '',
 }
 
 function makePreset(
@@ -99,6 +112,7 @@ function makePreset(
     id,
     name,
     video: {
+      videoEnabled: true,
       codec: 'libx264',
       container: 'mp4',
       resolution,
@@ -112,6 +126,7 @@ function makePreset(
     audioExport: { format: 'mp3', bitrate: '320k', sampleRate: 48000, channels: 2 },
     output: { ...DEFAULT_OUTPUT_CONFIG },
   }
+
 }
 
 export const BUILTIN_PRESETS: Preset[] = [

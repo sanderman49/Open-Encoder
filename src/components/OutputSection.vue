@@ -2,11 +2,13 @@
 import { computed } from 'vue'
 import { usePresetsStore } from '@/stores/presets'
 import { useFileDialog } from '@/composables/useFileDialog'
+import { useTemplateVars } from '@/composables/useTemplateVars'
+import VarInfoButton from './VarInfoButton.vue'
 import { FolderOpen } from 'lucide-vue-next'
 
 const store = usePresetsStore()
 const out = computed(() => store.currentConfig.output)
-const hasAudioExport = computed(() => !!store.currentConfig.audioExport)
+const { expand, hasVars } = useTemplateVars()
 const { pickOutputDir } = useFileDialog()
 
 async function browseVideoDir() {
@@ -14,64 +16,26 @@ async function browseVideoDir() {
   if (dir) out.value.videoDir = dir
 }
 
-const now = new Date()
-const pad = (n: number) => String(n).padStart(2, '0')
-const dateStr     = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
-const timeStr     = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`
-const datetimeStr = `${dateStr}_${timeStr}`
-
-const previewStem = computed(() => {
-  if (!out.value.nameOverride) return null
-  return out.value.nameOverride
-    .replace(/\$DATETIME/g, datetimeStr)
-    .replace(/\$DATE/g, dateStr)
-    .replace(/\$TIME/g, timeStr)
-})
+const previewFolder = computed(() =>
+  hasVars(out.value.videoDir) ? expand(out.value.videoDir) : null,
+)
 </script>
 
 <template>
   <div>
-    <p class="section-title">Output</p>
+    <p class="section-title">Path</p>
 
-    <!-- Output folder -->
     <div class="form-row">
       <label>Folder</label>
       <div class="path-row">
-        <input v-model="out.videoDir" placeholder="Same as original video" class="path-input" />
+        <input v-model="out.videoDir" placeholder="Same as original video" class="var-field path-input" />
         <button class="btn btn-ghost icon-btn" @click="browseVideoDir" title="Browse">
           <FolderOpen :size="14" />
         </button>
+        <VarInfoButton />
       </div>
     </div>
-
-    <!-- Name override -->
-    <p class="hint">Leave empty to use the editable title. Variables: <code>$DATE</code> <code>$TIME</code> <code>$DATETIME</code></p>
-    <div class="form-row">
-      <label>Name</label>
-      <input
-        v-model="out.nameOverride"
-        placeholder="Uses title from main screen"
-        class="path-input"
-      />
-    </div>
-    <p v-if="previewStem" class="filename-preview">
-      → <code>{{ previewStem }}.mp4</code>
-    </p>
-
-    <!-- Audio sub-section -->
-    <template v-if="hasAudioExport">
-      <p class="audio-section-title">AUDIO OUTPUT</p>
-
-      <p class="hint">Relative to video output folder. Created automatically if missing.</p>
-      <div class="form-row">
-        <label>Subfolder</label>
-        <input
-          v-model="out.audioDir"
-          placeholder="Same as video (e.g. audio)"
-          class="path-input"
-        />
-      </div>
-    </template>
+    <p v-if="previewFolder" class="filename-preview">→ <code>{{ previewFolder }}</code></p>
   </div>
 </template>
 
@@ -86,35 +50,11 @@ const previewStem = computed(() => {
 .path-input { flex: 1; min-width: 0; }
 .icon-btn { padding: 6px 8px; flex-shrink: 0; }
 
-.audio-section-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin: 20px 0 12px;
-}
-
-.hint {
-  color: var(--muted);
-  font-size: 12px;
-  margin-top: -8px;
-  margin-bottom: 6px;
-}
-.hint code {
-  color: var(--text);
-  font-size: 11px;
-  font-family: monospace;
-}
-
 .filename-preview {
   font-size: 12px;
   color: var(--muted);
   margin-top: -12px;
   margin-bottom: 18px;
 }
-.filename-preview code {
-  color: var(--text);
-  font-family: monospace;
-  font-size: 11px;
-}
+.filename-preview code { color: var(--text); font-family: monospace; font-size: 11px; word-break: break-all; }
 </style>

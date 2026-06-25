@@ -4,6 +4,7 @@ import { usePresetsStore } from '@/stores/presets'
 import { useJobsStore } from '@/stores/jobs'
 import { useJobRunner } from '@/composables/useJobRunner'
 import { useFileDialog } from '@/composables/useFileDialog'
+import { setSourceTitle } from '@/composables/useTemplateVars'
 import PresetBar from '@/components/PresetBar.vue'
 import DropZone from '@/components/DropZone.vue'
 import SettingsDrawer from '@/components/SettingsDrawer.vue'
@@ -53,8 +54,10 @@ function onFileSelected(path: string, probe: VideoProbeResult) {
   selectedFile.value = path
   probeResult.value = probe
   startError.value = null
-  // Default title to the input filename stem
-  videoTitle.value = path.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') ?? ''
+  // Default title to the input filename stem; also expose it for the $ORIGINAL variable
+  const stem = path.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') ?? ''
+  videoTitle.value = stem
+  setSourceTitle(stem)
 }
 
 async function onPickDir() {
@@ -69,6 +72,7 @@ function toRustConfig(cfg: typeof presetsStore.currentConfig) {
   const videoDir = o.videoDir || sessionOutputDir.value
   return {
     video: {
+      video_enabled: v.videoEnabled,
       codec: v.codec,
       container: v.container,
       resolution: v.resolution,
@@ -95,8 +99,10 @@ function toRustConfig(cfg: typeof presetsStore.currentConfig) {
       : null,
     outputConfig: {
       video_dir: videoDir,
+      video_subdir: o.videoSubdir,
       audio_dir: o.audioDir,
       name_override: o.nameOverride,
+      audio_name_override: o.audioNameOverride,
     },
   }
 }
@@ -106,7 +112,8 @@ async function handleStart() {
   starting.value = true
   startError.value = null
   try {
-    const { video, audioExport, outputConfig } = toRustConfig(presetsStore.currentConfig)
+    const cfg = presetsStore.currentConfig
+    const { video, audioExport, outputConfig } = toRustConfig(cfg)
     await startProcess({
       inputPath: selectedFile.value,
       video,
@@ -115,6 +122,8 @@ async function handleStart() {
       probe: probeResult.value,
       title: videoTitle.value,
       outputName: titleLocked.value ? expandedOverride.value : videoTitle.value,
+      hasVideo: cfg.video.videoEnabled,
+      hasAudio: !!cfg.audioExport,
     })
   } catch (e: unknown) {
     startError.value = e instanceof Error ? e.message : String(e)

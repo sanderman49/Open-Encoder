@@ -13,6 +13,8 @@ export interface StartProcessArgs {
   probe: VideoProbeResult
   title: string
   outputName: string
+  hasVideo: boolean
+  hasAudio: boolean
 }
 
 export function useJobRunner() {
@@ -36,7 +38,7 @@ export function useJobRunner() {
 
   async function startProcess(args: StartProcessArgs) {
     const jobId = crypto.randomUUID()
-    jobsStore.addJob(jobId, args.inputPath, args.outputName)
+    jobsStore.addJob(jobId, args.inputPath, args.outputName, args.hasVideo, args.hasAudio)
     await invoke('start_process', {
       request: {
         input_path: args.inputPath,

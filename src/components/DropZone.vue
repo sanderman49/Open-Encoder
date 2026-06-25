@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
+import type { UnlistenFn } from '@tauri-apps/api/event'
 import { useJobRunner } from '@/composables/useJobRunner'
 import { useFileDialog } from '@/composables/useFileDialog'
 import type { VideoProbeResult } from '@/types/preset'
@@ -36,11 +38,31 @@ async function handlePath(path: string) {
   }
 }
 
-async function onDrop(e: DragEvent) {
+// DOM drop is kept only to suppress browser default behaviour; actual path
+// comes from the Tauri webview event registered in onMounted.
+function onDrop() {
   dragging.value = false
-  const path = (e.dataTransfer?.files?.[0] as unknown as { path?: string })?.path
-  if (path) await handlePath(path)
 }
+
+let unlistenDrop: UnlistenFn | null = null
+
+onMounted(async () => {
+  unlistenDrop = await getCurrentWebview().onDragDropEvent(async (event) => {
+    if (event.payload.type === 'enter' || event.payload.type === 'over') {
+      dragging.value = true
+    } else if (event.payload.type === 'leave') {
+      dragging.value = false
+    } else if (event.payload.type === 'drop') {
+      dragging.value = false
+      const path = event.payload.paths?.[0]
+      if (path) await handlePath(path)
+    }
+  })
+})
+
+onUnmounted(() => {
+  unlistenDrop?.()
+})
 
 async function onBrowse() {
   const path = await pickVideoFile()

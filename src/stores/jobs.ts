@@ -16,18 +16,26 @@ export const useJobsStore = defineStore('jobs', () => {
       .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0)),
   )
 
-  function addJob(id: string, inputPath: string, outputName: string) {
+  function addJob(
+    id: string,
+    inputPath: string,
+    outputName: string,
+    hasVideo: boolean,
+    hasAudio: boolean,
+  ) {
     jobs.value.push({
       id,
       status: 'queued',
       inputPath,
       outputName,
-      videoOutput: '',
+      hasVideo,
+      hasAudio,
+      videoOutput: undefined,
       videoPercent: 0,
       audioPercent: 0,
       speed: 'N/A',
       etaSeconds: 0,
-      activePhase: 'video',
+      activePhase: hasVideo ? 'video' : 'audio',
       createdAt: Date.now(),
     })
   }
@@ -49,7 +57,7 @@ export const useJobsStore = defineStore('jobs', () => {
     job.status = 'completed'
     job.videoOutput = payload.video_output
     job.audioOutput = payload.audio_output
-    job.videoPercent = 100
+    job.videoPercent = payload.video_output ? 100 : 0
     job.audioPercent = payload.audio_output ? 100 : 0
     job.completedAt = Date.now()
   }

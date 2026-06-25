@@ -12,6 +12,57 @@ function backfillVideo(v: Partial<VideoConfig>): VideoConfig {
   }
 }
 
+// Allowed values — anything outside these means the config is malformed/tampered.
+const VALID = {
+  codec: ['libx264', 'libx265', 'libvp9', 'libsvtav1', 'copy'],
+  container: ['mp4', 'mkv', 'webm', 'mov'],
+  resolution: ['480p', '720p', '1080p', '1440p', '2160p', 'source', 'custom'],
+  framerate: ['source', '23.976', '24', '25', '29.97', '30', '50', '59.94', '60'],
+  hwAccel: ['none', 'nvenc', 'amf', 'qsv', 'videotoolbox', 'vaapi'],
+  algorithm: ['yadif', 'bwdif', 'estdif'],
+  encodePreset: ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'],
+  audioFormat: ['mp3', 'wav', 'flac', 'm4a', 'ogg', 'opus', 'aiff'],
+  sampleRate: [22050, 44100, 48000, 96000, 192000],
+  channels: [1, 2],
+} as const
+
+function isObj(x: unknown): x is Record<string, unknown> {
+  return typeof x === 'object' && x !== null && !Array.isArray(x)
+}
+
+// Reject structurally invalid or impossible configs (e.g. nothing to export).
+// A rejected preset is simply not loaded.
+function validatePreset(p: Preset): boolean {
+  if (!isObj(p) || typeof p.id !== 'string' || typeof p.name !== 'string') return false
+
+  const v = p.video as VideoConfig
+  if (!isObj(v)) return false
+  if (typeof v.videoEnabled !== 'boolean') return false
+  if (!VALID.codec.includes(v.codec as never)) return false
+  if (!VALID.container.includes(v.container as never)) return false
+  if (!VALID.resolution.includes(v.resolution as never)) return false
+  if (!VALID.framerate.includes(v.framerate as never)) return false
+  if (!VALID.hwAccel.includes(v.hwAccel as never)) return false
+  if (typeof v.crf !== 'number' || v.crf < 0 || v.crf > 51) return false
+  if (v.encodePreset !== null && !VALID.encodePreset.includes(v.encodePreset as never)) return false
+  const di = v.deinterlace
+  if (!isObj(di) || typeof di.enabled !== 'boolean' || typeof di.autoDetect !== 'boolean'
+      || !VALID.algorithm.includes(di.algorithm as never)) return false
+
+  const a = p.audioExport
+  if (a !== null) {
+    if (!isObj(a)) return false
+    if (!VALID.audioFormat.includes(a.format as never)) return false
+    if (!VALID.sampleRate.includes(a.sampleRate as never)) return false
+    if (!VALID.channels.includes(a.channels as never)) return false
+  }
+
+  // Core invariant: a job must produce something.
+  if (!v.videoEnabled && a === null) return false
+
+  return true
+}
+
 export const usePresetsStore = defineStore('presets', () => {
   const userPresets = ref<Preset[]>([])
   const activePresetId = ref<string>(BUILTIN_PRESETS[0].id)
@@ -42,11 +93,18 @@ export const usePresetsStore = defineStore('presets', () => {
     try {
       const store = await load('presets.json', { autoSave: false } as Parameters<typeof load>[1])
       const saved = await store.get<Preset[]>('presets')
-      if (saved) userPresets.value = saved.map(p => ({
-        ...p,
-        video: backfillVideo(p.video as Partial<VideoConfig>),
-        output: { ...DEFAULT_OUTPUT_CONFIG, ...(p.output ?? {}) },
-      }))
+      if (saved) {
+        const normalized = saved.map(p => ({
+          ...p,
+          video: backfillVideo(p.video as Partial<VideoConfig>),
+          output: { ...DEFAULT_OUTPUT_CONFIG, ...(p.output ?? {}) },
+        }))
+        const valid = normalized.filter(validatePreset)
+        if (valid.length !== normalized.length) {
+          console.warn(`Skipped ${normalized.length - valid.length} invalid preset(s) in presets.json`)
+        }
+        userPresets.value = valid
+      }
       const savedId = await store.get<string>('activePresetId')
       const target = savedId ? allPresets.value.find(p => p.id === savedId) : null
       applyPreset(target ?? allPresets.value[0])

@@ -18,7 +18,8 @@ function dirname(p: string) {
   return parts.join('/')
 }
 
-async function openFolder(filePath: string) {
+async function openFolder(filePath?: string) {
+  if (!filePath) return
   await invoke('reveal_in_folder', { path: filePath }).catch(() => {})
 }
 
@@ -40,7 +41,7 @@ function formatTime(ms: number) {
       </div>
 
       <template v-if="job.status === 'completed'">
-        <div class="output-row" @click="openFolder(job.videoOutput)" title="Open folder">
+        <div v-if="job.videoOutput" class="output-row" @click="openFolder(job.videoOutput)" title="Open folder">
           <span class="output-icon">🎬</span>
           <span class="output-name">{{ basename(job.videoOutput) }}</span>
           <span class="open-hint">↗</span>

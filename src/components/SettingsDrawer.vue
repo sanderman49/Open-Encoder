@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import VideoSection from './VideoSection.vue'
-import DeinterlaceSection from './DeinterlaceSection.vue'
 import AudioExportSection from './AudioExportSection.vue'
 import OutputSection from './OutputSection.vue'
 
@@ -23,8 +22,6 @@ function close() { emit('update:open', false) }
         </div>
         <div class="drawer__body">
           <VideoSection />
-          <div class="divider" />
-          <DeinterlaceSection />
           <div class="divider" />
           <AudioExportSection />
           <div class="divider" />
@@ -76,6 +73,7 @@ function close() { emit('update:open', false) }
 .drawer__body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px;
 }
 

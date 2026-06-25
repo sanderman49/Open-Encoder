@@ -30,7 +30,7 @@ function basename(p: string) { return p.split(/[/\\]/).pop() ?? p }
         <button class="btn btn-ghost cancel-btn" @click="$emit('cancel', job.id)">Cancel</button>
       </div>
 
-      <div class="phase-row">
+      <div v-if="job.hasVideo" class="phase-row">
         <span class="phase-label">Video</span>
         <div class="bar-wrap">
           <div class="bar" :style="{ width: job.videoPercent + '%' }" />
@@ -38,7 +38,7 @@ function basename(p: string) { return p.split(/[/\\]/).pop() ?? p }
         <span class="pct">{{ Math.round(job.videoPercent) }}%</span>
       </div>
 
-      <div v-if="job.audioOutput !== undefined || job.activePhase === 'audio'" class="phase-row">
+      <div v-if="job.hasAudio" class="phase-row">
         <span class="phase-label">Audio</span>
         <div class="bar-wrap">
           <div class="bar bar--audio" :style="{ width: job.audioPercent + '%' }" />

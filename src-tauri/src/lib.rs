@@ -19,6 +19,7 @@ pub fn run() {
             commands::start_process,
             commands::cancel_job,
             commands::reveal_in_folder,
+            commands::list_vaapi_devices,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

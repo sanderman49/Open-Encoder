@@ -34,8 +34,12 @@ pub struct DeinterlaceConfig {
     pub algorithm: String,
 }
 
+fn default_true() -> bool { true }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VideoConfig {
+    #[serde(default = "default_true")]
+    pub video_enabled: bool,
     pub codec: String,
     pub container: String,
     pub resolution: String,
@@ -66,9 +70,13 @@ pub struct OutputConfig {
     #[serde(default)]
     pub video_dir: String,
     #[serde(default)]
+    pub video_subdir: String,
+    #[serde(default)]
     pub audio_dir: String,
     #[serde(default)]
     pub name_override: String,
+    #[serde(default)]
+    pub audio_name_override: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,7 +104,7 @@ struct ProgressEvent {
 #[derive(Debug, Clone, Serialize)]
 struct CompleteEvent {
     job_id: String,
-    video_output: String,
+    video_output: Option<String>,
     audio_output: Option<String>,
 }
 
@@ -252,6 +260,11 @@ async fn run_process(
 ) -> Result<(), String> {
     let oc = &req.output_config;
 
+    // Refuse a job that would produce nothing.
+    if !req.video.video_enabled && req.audio_export.is_none() {
+        return Err("Nothing to export: enable video output, audio output, or both.".into());
+    }
+
     let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
     let secs_of_day = ts % 86400;
     let (dy, dm, dd) = secs_to_ymd(ts);
@@ -262,10 +275,44 @@ async fn run_process(
     let time_str     = format!("{:02}-{:02}-{:02}", hh, mm, ss);
     let datetime_str = format!("{:04}-{:02}-{:02}_{:02}-{:02}-{:02}", dy, dm, dd, hh, mm, ss);
 
+    let codec_label = match req.video.codec.as_str() {
+        "libx264"   => "h264",
+        "libx265"   => "h265",
+        "libvp9"    => "vp9",
+        "libsvtav1" => "av1",
+        "copy"      => "original",
+        other       => other,
+    };
+    let resolution_label = match req.video.resolution.as_str() {
+        "custom" => format!(
+            "{}x{}",
+            req.video.custom_width.unwrap_or(0),
+            req.video.custom_height.unwrap_or(0)
+        ),
+        other => other.to_string(),
+    };
+    let do_di = req.video.deinterlace.enabled
+        && (!req.video.deinterlace.auto_detect || req.probe.is_interlaced);
+    let di_label = if do_di { "DI" } else { "" };
+    let crf_str    = req.video.crf.to_string();
+    let preset_str = req.video.encode_preset.clone().unwrap_or_default();
+    let original_title = Path::new(&req.input_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_string();
+
     let expand = |s: &str| -> String {
-        s.replace("$DATETIME", &datetime_str)
-         .replace("$DATE", &date_str)
-         .replace("$TIME", &time_str)
+        s.replace("$ORIGINAL",   &original_title)
+         .replace("$DATETIME",   &datetime_str)
+         .replace("$DATE",       &date_str)
+         .replace("$TIME",       &time_str)
+         .replace("$CODEC",      codec_label)
+         .replace("$RESOLUTION", &resolution_label)
+         .replace("$FRAMERATE",  &req.video.framerate)
+         .replace("$CRF",        &crf_str)
+         .replace("$PRESET",     &preset_str)
+         .replace("$DI",         di_label)
     };
 
     // Determine output stem: name_override (with vars expanded) or user-edited title
@@ -286,51 +333,68 @@ async fn run_process(
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
 
-    let video_dir = resolve_output_dir(&oc.video_dir, &input_parent, false)?;
-
-    // Audio dir is always relative to the video output dir
-    let audio_dir = resolve_output_dir(&oc.audio_dir, &video_dir, true)?;
-
-    // ── Video pass ───────────────────────────────────────────────────────────
-    let ext = if req.video.codec == "copy" {
-        Path::new(&req.input_path)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("mp4")
-            .to_string()
+    let base_dir = resolve_output_dir(&expand(&oc.video_dir), &input_parent, false)?;
+    // When video is exported, its subfolder is created and audio nests under it.
+    // When video is disabled, skip the video subfolder entirely so audio lands in base_dir.
+    let video_dir = if req.video.video_enabled {
+        resolve_output_dir(&expand(&oc.video_subdir), &base_dir, true)?
     } else {
-        req.video.container.clone()
+        base_dir.clone()
     };
+    let audio_dir = resolve_output_dir(&expand(&oc.audio_dir), &video_dir, true)?;
 
-    let video_out = {
-        let candidate = video_dir.join(format!("{}.{}", stem, ext));
-        if candidate == Path::new(&req.input_path) {
-            video_dir.join(format!("{}_1.{}", stem, ext))
+    // ── Video pass (skipped when video export is disabled) ─────────────────────
+    let video_out = if req.video.video_enabled {
+        let ext = if req.video.codec == "copy" {
+            Path::new(&req.input_path)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("mp4")
+                .to_string()
         } else {
-            candidate
-        }
-    }.to_string_lossy().to_string();
-    let video_args = build_video_args(&req, &video_out);
+            req.video.container.clone()
+        };
 
-    let (mut rx, child) = app
-        .shell()
-        .sidecar("ffmpeg")
-        .map_err(|e| e.to_string())?
-        .args(&video_args)
-        .spawn()
-        .map_err(|e| e.to_string())?;
+        let out = {
+            let candidate = video_dir.join(format!("{}.{}", stem, ext));
+            if candidate == Path::new(&req.input_path) {
+                video_dir.join(format!("{}_1.{}", stem, ext))
+            } else {
+                candidate
+            }
+        }.to_string_lossy().to_string();
+        let video_args = build_video_args(&req, &out);
 
-    job_store.lock().unwrap().insert(req.job_id.clone(), child);
+        let (mut rx, child) = app
+            .shell()
+            .sidecar("ffmpeg")
+            .map_err(|e| e.to_string())?
+            .args(&video_args)
+            .spawn()
+            .map_err(|e| e.to_string())?;
 
-    run_ffmpeg_loop(
-        &mut rx, &app, &job_store,
-        req.probe.duration, &req.job_id, &req.job_id, "video",
-    ).await?;
+        job_store.lock().unwrap().insert(req.job_id.clone(), child);
+
+        run_ffmpeg_loop(
+            &mut rx, &app, &job_store,
+            req.probe.duration, &req.job_id, &req.job_id, "video",
+        ).await?;
+
+        Some(out)
+    } else {
+        None
+    };
 
     // ── Audio export pass ────────────────────────────────────────────────────
     let audio_out = if let Some(ref cfg) = req.audio_export {
+        // Audio stem inherits the video stem unless an explicit override is set.
+        let audio_stem = if !oc.audio_name_override.is_empty() {
+            expand(&oc.audio_name_override)
+        } else {
+            stem.clone()
+        };
         let out = audio_dir
-            .join(format!("{}.{}", stem, cfg.format))
+            .join(format!("{}.{}", audio_stem, cfg.format))
             .to_string_lossy()
             .to_string();
         let args = build_audio_args(&req.input_path, cfg, &out);
@@ -550,14 +614,28 @@ fn build_video_args(req: &ProcessRequest, output: &str) -> Vec<String> {
     let hw = req.video.hw_accel.as_str();
     let hw_codec = if is_copy { None } else { get_hw_codec(&req.video.codec, hw) };
 
+    // Determine whether any software filter will be in the chain.
+    // VideoToolbox hw-decode puts frames in GPU memory; software filters can't touch them,
+    // so we only enable hw-decode when the filter chain will be empty.
+    let do_di = req.video.deinterlace.enabled
+        && (!req.video.deinterlace.auto_detect || req.probe.is_interlaced);
+    let has_scale = !matches!(req.video.resolution.as_str(), "source")
+        && !(req.video.resolution == "custom"
+            && (req.video.custom_width.unwrap_or(0) == 0
+                || req.video.custom_height.unwrap_or(0) == 0));
+    let has_filters = do_di || has_scale;
+
     // Hardware decode acceleration flags (before -i)
     if !is_copy {
         match hw {
             "nvenc" => args.extend(["-hwaccel".into(), "cuda".into()]),
             "qsv"   => args.extend(["-hwaccel".into(), "qsv".into()]),
-            "videotoolbox" => args.extend(["-hwaccel".into(), "videotoolbox".into()]),
-            // VAAPI: SW decode + HW encode path — just set device globally, no hwaccel flags.
-            // Frames upload to GPU via hwupload filter in the filter chain.
+            // Only enable VideoToolbox hw-decode when no software filters follow;
+            // otherwise frames stay in GPU memory and the filter chain fails.
+            "videotoolbox" if !has_filters => {
+                args.extend(["-hwaccel".into(), "videotoolbox".into()]);
+            }
+            // VAAPI: SW decode + HW encode — set device globally, upload via hwupload in filter chain.
             "vaapi" => args.extend(["-vaapi_device".into(), req.video.vaapi_device.clone()]),
             _ => {}
         }
@@ -621,8 +699,9 @@ fn build_video_args(req: &ProcessRequest, output: &str) -> Vec<String> {
                 "-preset".into(), map_qsv_preset(ep).into(),
             ]),
             "videotoolbox" => {
+                // global_quality is a 0–100 scale (higher = better); map from CRF (0=best, 51=worst)
                 let q = (100.0 - crf as f64 * 100.0 / 51.0).round() as u32;
-                args.extend(["-c:v".into(), hc.clone(), "-q:v".into(), q.to_string()]);
+                args.extend(["-c:v".into(), hc.clone(), "-global_quality".into(), q.to_string()]);
             }
             "vaapi" => args.extend([
                 "-c:v".into(), hc.clone(),
@@ -725,6 +804,20 @@ fn build_audio_args(input: &str, cfg: &AudioExportConfig, output: &str) -> Vec<S
 
     args.push(output.to_string());
     args
+}
+
+// ─── list_vaapi_devices ───────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn list_vaapi_devices() -> Vec<String> {
+    let mut devices: Vec<String> = (128u32..=135)
+        .map(|n| format!("/dev/dri/renderD{}", n))
+        .filter(|p| std::path::Path::new(p).exists())
+        .collect();
+    if devices.is_empty() {
+        devices.push("/dev/dri/renderD128".into());
+    }
+    devices
 }
 
 // ─── cancel_job ───────────────────────────────────────────────────────────────

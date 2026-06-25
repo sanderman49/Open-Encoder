@@ -5,7 +5,9 @@ export interface Job {
   status: JobStatus
   inputPath: string
   outputName: string
-  videoOutput: string
+  hasVideo: boolean
+  hasAudio: boolean
+  videoOutput?: string
   audioOutput?: string
   videoPercent: number
   audioPercent: number
@@ -27,7 +29,7 @@ export interface JobProgressPayload {
 
 export interface JobCompletePayload {
   job_id: string
-  video_output: string
+  video_output?: string
   audio_output?: string
 }
 
