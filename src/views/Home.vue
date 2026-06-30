@@ -99,6 +99,7 @@ function toRustConfig(cfg: typeof presetsStore.currentConfig) {
       : null,
     outputConfig: {
       video_dir: videoDir,
+      export_dir: o.exportDir,
       video_subdir: o.videoSubdir,
       audio_dir: o.audioDir,
       name_override: o.nameOverride,

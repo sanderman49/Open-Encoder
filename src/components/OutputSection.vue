@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { usePresetsStore } from '@/stores/presets'
 import { useFileDialog } from '@/composables/useFileDialog'
 import { useTemplateVars } from '@/composables/useTemplateVars'
 import VarInfoButton from './VarInfoButton.vue'
+import ToggleSwitch from './ToggleSwitch.vue'
 import { FolderOpen } from 'lucide-vue-next'
 
 const store = usePresetsStore()
@@ -18,6 +19,21 @@ async function browseVideoDir() {
 
 const previewFolder = computed(() =>
   hasVars(out.value.videoDir) ? expand(out.value.videoDir) : null,
+)
+
+const lastExportDir = ref(out.value.exportDir || 'output')
+const exportDirEnabled = ref(out.value.exportDir !== '')
+watch(exportDirEnabled, (on) => {
+  if (on) {
+    out.value.exportDir = lastExportDir.value
+  } else {
+    lastExportDir.value = out.value.exportDir || lastExportDir.value
+    out.value.exportDir = ''
+  }
+})
+
+const exportDirPreview = computed(() =>
+  exportDirEnabled.value && hasVars(out.value.exportDir) ? expand(out.value.exportDir) : null,
 )
 </script>
 
@@ -36,6 +52,23 @@ const previewFolder = computed(() =>
       </div>
     </div>
     <p v-if="previewFolder" class="filename-preview">→ <code>{{ previewFolder }}</code></p>
+
+    <div class="form-row">
+      <span class="toggle-label">
+        <ToggleSwitch v-model="exportDirEnabled" /> Export folder
+      </span>
+      <div class="field-with-info">
+        <input
+          v-model="out.exportDir"
+          placeholder="output"
+          class="var-field subdir-input"
+          :disabled="!exportDirEnabled"
+          :class="{ disabled: !exportDirEnabled }"
+        />
+        <VarInfoButton />
+      </div>
+    </div>
+    <p v-if="exportDirPreview" class="filename-preview">→ <code>{{ exportDirPreview }}</code></p>
   </div>
 </template>
 
@@ -49,6 +82,15 @@ const previewFolder = computed(() =>
 }
 .path-input { flex: 1; min-width: 0; }
 .icon-btn { padding: 6px 8px; flex-shrink: 0; }
+
+.field-with-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+}
 
 .filename-preview {
   font-size: 12px;

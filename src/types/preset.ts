@@ -40,8 +40,9 @@ export interface AudioExportConfig {
 
 export interface OutputConfig {
   videoDir: string          // base output dir (absolute); supports variables; empty = input dir
-  videoSubdir: string       // subfolder within videoDir for video; empty = directly in videoDir
-  audioDir: string          // subfolder within videoDir for audio; empty = same as videoDir
+  exportDir: string         // subfolder inside videoDir shared by video and audio; empty = directly in videoDir
+  videoSubdir: string       // subfolder within exportDir for video; empty = directly in exportDir
+  audioDir: string          // subfolder within exportDir for audio; empty = same as exportDir
   nameOverride: string      // video filename stem override; supports variables; empty = use title
   audioNameOverride: string // audio filename stem override; supports variables; empty = inherit video stem
 }
@@ -97,6 +98,7 @@ export const DEFAULT_AUDIO_EXPORT_CONFIG: AudioExportConfig = {
 
 export const DEFAULT_OUTPUT_CONFIG: OutputConfig = {
   videoDir: '',
+  exportDir: '',
   videoSubdir: '',
   audioDir: '',
   nameOverride: '',

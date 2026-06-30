@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Video Processor",
+  "productName": "Encode Thing",
   "version": "0.1.0",
   "identifier": "com.videoprocessor.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Video Processor",
+        "title": "Encode Thing",
         "width": 920,
         "height": 720,
         "minWidth": 700,

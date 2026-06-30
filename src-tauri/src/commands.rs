@@ -70,6 +70,8 @@ pub struct OutputConfig {
     #[serde(default)]
     pub video_dir: String,
     #[serde(default)]
+    pub export_dir: String,
+    #[serde(default)]
     pub video_subdir: String,
     #[serde(default)]
     pub audio_dir: String,
@@ -334,14 +336,15 @@ async fn run_process(
         .unwrap_or_else(|| std::path::PathBuf::from("."));
 
     let base_dir = resolve_output_dir(&expand(&oc.video_dir), &input_parent, false)?;
-    // When video is exported, its subfolder is created and audio nests under it.
-    // When video is disabled, skip the video subfolder entirely so audio lands in base_dir.
+    // export_dir sits between the base destination and the per-type subdirs so that
+    // both video and audio land as siblings under a shared folder.
+    let export_dir = resolve_output_dir(&expand(&oc.export_dir), &base_dir, true)?;
     let video_dir = if req.video.video_enabled {
-        resolve_output_dir(&expand(&oc.video_subdir), &base_dir, true)?
+        resolve_output_dir(&expand(&oc.video_subdir), &export_dir, true)?
     } else {
-        base_dir.clone()
+        export_dir.clone()
     };
-    let audio_dir = resolve_output_dir(&expand(&oc.audio_dir), &video_dir, true)?;
+    let audio_dir = resolve_output_dir(&expand(&oc.audio_dir), &export_dir, true)?;
 
     // ── Video pass (skipped when video export is disabled) ─────────────────────
     let video_out = if req.video.video_enabled {
